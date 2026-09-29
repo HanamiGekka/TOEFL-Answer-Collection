@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version-file: app/.nvmrc
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm audit --package-lock-only --ignore-scripts --audit-level=high
+      - run: npm run audit:privacy
+      - run: npm run audit:i18n
+      - run: npm run audit:public-release
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build
+      # playwright.config.ts uses the branded Chrome channel.
+      - run: npx playwright install --with-deps chrome
+      - run: npm run e2e
+
+  native-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version-file: app/.nvmrc
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      # rustup reads the pinned toolchain from app/src-tauri/rust-toolchain.toml.
+      - run: rustup show active-toolchain
+        working-directory: app/src-tauri
+      - run: cargo fmt --check
+        working-directory: app/src-tauri
+      - run: cargo check --locked
+        working-directory: app/src-tauri
+      - run: cargo test --locked
+        working-directory: app/src-tauri
+      - run: cargo install cargo-audit --version 0.22.2 --locked
+        working-directory: app/src-tauri
+      - run: cargo audit
+        working-directory: app/src-tauri
+      - run: npm run tauri:build
+      - run: npm run verify:windows-release
+      - name: Verify Windows NSIS package
+        shell: pwsh
+        run: |
+          $exe = 'src-tauri/target/release/toefl-answer-collection.exe'
+          $packages = @(Get-ChildItem -LiteralPath 'src-tauri/target/release/bundle/nsis' -Filter '*-setup.exe' -File)
+          if (-not (Test-Path -LiteralPath $exe -PathType Leaf) -or $packages.Count -ne 1) {
+            throw 'Expected one release executable and one NSIS setup executable'
+          }
+          if ((Get-Item -LiteralPath $exe).VersionInfo.ProductName -ne 'TOEFL Answer Collection') {
+            throw 'Unexpected Windows product metadata'
+          }
+          if ((Get-Item -LiteralPath $exe).VersionInfo.ProductVersion -ne '1.0.0') {
+            throw 'Unexpected Windows product version'
+          }
+          if ($packages[0].Name -ne 'TOEFL Answer Collection_1.0.0_x64-setup.exe') {
+            throw 'Unexpected NSIS package version or architecture'
+          }
+          Add-Type -AssemblyName System.Drawing
+          foreach ($path in @($exe, $packages[0].FullName)) {
+            $actualIcon = [System.Drawing.Icon]::ExtractAssociatedIcon((Resolve-Path -LiteralPath $path).Path)
+            $expectedIcon = [System.Drawing.Icon]::new((Resolve-Path -LiteralPath 'src-tauri/icons/icon.ico').Path, $actualIcon.Size)
+            $actualBitmap = $actualIcon.ToBitmap()
+            $expectedBitmap = $expectedIcon.ToBitmap()
+            for ($x = 0; $x -lt $actualBitmap.Width; $x++) {
+              for ($y = 0; $y -lt $actualBitmap.Height; $y++) {
+                if ($actualBitmap.GetPixel($x, $y).ToArgb() -ne $expectedBitmap.GetPixel($x, $y).ToArgb()) {
+                  throw "Unexpected Windows icon: $path"
+                }
+              }
+            }
+            $actualBitmap.Dispose()
+            $expectedBitmap.Dispose()
+            $actualIcon.Dispose()
+            $expectedIcon.Dispose()
+          }
+          foreach ($path in @($exe, $packages[0].FullName)) {
+            $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $path
+            Write-Output "$($hash.Hash)  $($hash.Path)"
+          }

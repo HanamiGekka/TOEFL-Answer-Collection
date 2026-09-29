@@ -1,0 +1,60 @@
+{
+  "name": "toefl-answer-collection",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "type": "module",
+  "description": "Local TOEFL answer recording, timing, and blind typing practice.",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "tauri:dev": "tauri dev",
+    "build": "tsc --noEmit && vite build",
+    "tauri:build": "tauri build",
+    "verify:windows-release": "node scripts/verify-windows-release.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "audit:privacy": "node --test scripts/check-current-tree-privacy.selfcheck.mjs && node scripts/check-current-tree-privacy.mjs",
+    "audit:i18n": "node scripts/audit-i18n.mjs",
+    "audit:public-release": "node ../scripts/public-release/audit.mjs",
+    "audit:session": "node scripts/audit-session-export.mjs",
+    "verify:r0071-auditor": "vitest run --run scripts/r0071-blueprint-audit.test.mjs",
+    "verify:r0072.1-lifecycle": "node scripts/verify-r0072-1-lifecycle.mjs",
+    "verify:r0073-dynamic": "node scripts/verify-r0073-dynamic.mjs",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-dialog": "2.7.2",
+    "clsx": "^2.1.1",
+    "i18next": "^26.4.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-i18next": "^17.0.15",
+    "zustand": "^4.5.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.45.0",
+    "@tauri-apps/cli": "^2.0.0",
+    "@testing-library/jest-dom": "^6.4.8",
+    "@testing-library/react": "^16.0.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "jsdom": "^24.1.1",
+    "typescript": "5.5.4",
+    "vite": "^6.4.3",
+    "vitest": "^4.1.11"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true
+  }
+}

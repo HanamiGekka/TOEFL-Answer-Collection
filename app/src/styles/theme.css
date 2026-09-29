@@ -1,0 +1,47 @@
+:root {
+  --theme-name: "TOEFL Reference Light Theme";
+
+  --color-brand-header: #0f7478;
+  --color-brand-header-hover: #0b6266;
+  --color-brand-action: #168d94;
+  --color-brand-accent: #19cdb5;
+  --color-brand-accent-soft: #ddf7f2;
+
+  --color-canvas: #ffffff;
+  --color-surface: #f7f9f9;
+  --color-surface-muted: #eef2f2;
+  --color-surface-elevated: #ffffff;
+  --color-surface-brand: #edf8f7;
+  --color-surface-warning: #fff7e0;
+  --color-surface-danger: #fff0ee;
+  --color-surface-success: #eaf6f0;
+
+  --color-text-primary: #192328;
+  --color-text-secondary: #5d686e;
+  --color-text-on-brand: #ffffff;
+  --color-text-on-brand-muted: #d8f0ef;
+  --color-text-warning: #714300;
+  --color-text-danger: #8e1b13;
+  --color-text-success: #166344;
+
+  --color-border: #d5dddd;
+  --color-border-strong: #aebbbc;
+  --color-current: #d99a00;
+  --color-answered: #0f7478;
+  --color-skipped: #66747a;
+  --color-uncertain: #a45c00;
+  --color-overtime: #b42318;
+  --color-danger: #b42318;
+  --color-focus-ring: #08747a;
+  --color-overlay: #123a3dcc;
+  --color-shadow: #1335381f;
+  --color-scrollbar: #aebbbc;
+  --color-scrollbar-hover: #7c8d8e;
+  --color-selection: #c9f1ea;
+
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-dialog: 16px;
+  --shadow-soft: 0 4px 14px var(--color-shadow);
+  --shadow-dialog: 0 14px 38px var(--color-shadow);
+}

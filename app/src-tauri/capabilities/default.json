@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default permissions for local TOEFL answer collection.",
+  "windows": ["main"],
+  "permissions": ["core:default", "core:window:allow-destroy", "dialog:allow-open"]
+}

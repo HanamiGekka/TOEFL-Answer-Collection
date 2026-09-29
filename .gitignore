@@ -1,0 +1,217 @@
+# ============================================================
+# TOEFL Answer Collection
+# Local files, runtime data, build products and private records
+# ============================================================
+
+
+# ============================================================
+# Local requirements and reference materials
+# These files may contain large DOCX files, screenshots,
+# original prompts and copyrighted reference materials.
+# ============================================================
+
+Demand/
+/temp/
+/local_assets/
+/Code prompt/
+/real_data/
+/private_data/
+/personal_exports/
+/Organized_TOEFL_Resources/
+/tmp/
+/private_screenshots/
+
+
+# ============================================================
+# TOEFL personal records and runtime output
+# Keep only .gitkeep so Git can preserve the empty directories.
+# ============================================================
+
+records/*
+!records/.gitkeep
+
+typing_records/*
+!typing_records/.gitkeep
+
+exports/*
+!exports/.gitkeep
+
+backups/*
+!backups/.gitkeep
+
+logs/*
+!logs/.gitkeep
+
+trash/*
+!trash/.gitkeep
+
+data/*
+!data/.gitkeep
+!data/recovery/
+data/recovery/*
+!data/recovery/.gitkeep
+
+
+# ============================================================
+# Databases, recovery events and runtime logs
+# ============================================================
+
+*.db
+*.sqlite
+*.sqlite3
+data/*.sqlite3*
+*.db-shm
+*.db-wal
+*.jsonl
+# Sanitized acceptance fixtures are source-controlled test evidence, not runtime events.
+!app/scripts/fixtures/**/events.jsonl
+*.log
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+
+# ============================================================
+# Machine-specific configuration
+#
+# app-settings.json contains local absolute paths and should
+# not be shared. The example configuration should be tracked.
+# ============================================================
+
+config/app-settings.json
+config/*.local.json
+config/app-settings.last-known-good.json
+
+!config/app-settings.example.json
+!config/*.example.json
+!config/*.sample.json
+
+# Keep TOEFL timing profiles under version control.
+!config/timing-profiles/
+!config/timing-profiles/*.json
+
+
+# ============================================================
+# JavaScript / React / Vite
+# ============================================================
+
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+
+.eslintcache
+.stylelintcache
+
+*.tsbuildinfo
+*.local
+
+vite.config.*.timestamp-*
+vitest.config.*.timestamp-*
+
+
+# ============================================================
+# Automated test output
+# Test source files and test_fixtures remain tracked.
+# ============================================================
+
+playwright-report/
+test-results/
+blob-report/
+.r0062-manual-fixtures/
+app/.r0062-manual-fixtures/
+.r0063-failure-fixtures/
+.r0063-manual-fixtures/
+.r0063-verification-fixtures/
+.r0064-manual-fixtures/
+.r0064-revalidation-fixtures/
+.r0073-verification-fixtures/
+app/.r0073-verification-fixtures/
+
+.nyc_output/
+
+
+# ============================================================
+# Tauri / Rust
+# ============================================================
+
+app/src-tauri/target/
+src-tauri/target/
+target/
+app/src-tauri/bundle/
+release-artifacts/
+*.msi
+*.msix
+*.AppImage
+*.dmg
+
+# Generated Tauri schemas can be regenerated.
+app/src-tauri/gen/schemas/
+src-tauri/gen/schemas/
+
+
+# ============================================================
+# Keep dependency lock files
+# ============================================================
+
+!package-lock.json
+!pnpm-lock.yaml
+!yarn.lock
+!Cargo.lock
+
+
+# ============================================================
+# Environment variables and secrets
+# ============================================================
+
+.env
+.env.*
+!.env.example
+
+
+# ============================================================
+# IDE and editor files
+# ============================================================
+
+.idea/
+
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+*.code-workspace
+
+
+# ============================================================
+# Windows / macOS / system files
+# ============================================================
+
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+$RECYCLE.BIN/
+System Volume Information/
+
+
+# ============================================================
+# Temporary files and editor backups
+# ============================================================
+
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+*.rej
+*.swp
+*.swo
+
+~$*
+*~

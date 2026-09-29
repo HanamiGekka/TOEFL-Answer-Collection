@@ -1,0 +1,1 @@
+section,task_id,task_type,status,active_time_ms,pause_time_ms,timer_limit_ms,remaining_ms,attempt_count,completed,needs_retry,overtime,word_count,character_count,keyboard_cpm,keyboard_characters,pasted_characters,deleted_characters,cut_count,paste_count,undo_count,redo_count,modification_count

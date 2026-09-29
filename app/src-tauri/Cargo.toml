@@ -1,0 +1,25 @@
+[package]
+name = "toefl-answer-collection"
+version = "1.0.0"
+description = "TOEFL local answer collection and typing practice"
+authors = ["Local"]
+edition = "2021"
+
+[lib]
+name = "toefl_answer_collection_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0.0", features = [] }
+
+[dependencies]
+anyhow = "1.0"
+regex = "1.10"
+rusqlite = { version = "0.31", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tauri = { version = "2.0.0", features = [] }
+tauri-plugin-dialog = "=2.7.2"
+thiserror = "1.0"
+time = { version = "0.3", features = ["formatting", "macros"] }
+windows-sys = { version = "0.52", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }

@@ -1,0 +1,83 @@
+{
+  "profile_id": "toefl-2026-practice",
+  "profile_version": "1.0.0",
+  "source_note": "Editable local practice timing reference; these values are not an official fixed TOEFL timing requirement.",
+  "created_at": "2026-07-07T00:00:00+08:00",
+  "mode": "practice",
+  "section_rules": {
+    "Reading": {
+      "modules": [
+        { "module_id": "R1", "items": 35, "duration_seconds": 1080 },
+        { "module_id": "R2", "items": 15, "duration_seconds": 540 }
+      ],
+      "task_order": ["Complete the Words", "Read in Daily Life", "Read an Academic Passage"],
+      "allow_review": true,
+      "allow_back": true,
+      "auto_advance_on_timeout": false
+    },
+    "Listening": {
+      "modules": [
+        { "module_id": "L1", "items": 35 },
+        { "module_id": "L2", "items": 12 }
+      ],
+      "task_order": [
+        "Listen and Choose a Response",
+        "Listen to a Conversation",
+        "Listen to an Announcement",
+        "Listen to an Academic Talk"
+      ],
+      "reference_answer_seconds": {
+        "Listen and Choose a Response": 20,
+        "Listen to a Conversation": 30,
+        "Listen to an Announcement": 30,
+        "Listen to an Academic Talk": 30
+      },
+      "answer_seconds_are_reference": true,
+      "allow_review": true,
+      "allow_back": true,
+      "requires_user_audio_end_mark": false,
+      "auto_advance_on_timeout": false
+    },
+    "Writing": {
+      "tasks": [
+        { "task_id": "W1", "name": "Build a Sentence", "items": 10, "duration_seconds": 420 },
+        { "task_id": "W2", "name": "Write an Email", "items": 1, "duration_seconds": 420 },
+        { "task_id": "W3", "name": "Write for an Academic Discussion", "items": 1, "duration_seconds": 600 }
+      ],
+      "allow_review": true,
+      "allow_back": true,
+      "auto_submit_on_timeout": false
+    },
+    "Speaking": {
+      "tasks": [
+        { "task_id": "S1", "name": "Listen and Repeat", "items": 7, "group_seconds": 120 },
+        { "task_id": "S2", "name": "Take an Interview", "items": 4, "preparation_seconds": 0, "answer_seconds": 45 }
+      ],
+      "duration_seconds_reference": 480,
+      "allow_retake": true,
+      "record_audio": false,
+      "score_audio": false
+    }
+  },
+  "task_rules": {
+    "default_single_choice_options": 4,
+    "single_choice_min_options": 2,
+    "single_choice_max_options": 6,
+    "writing_spellcheck": false,
+    "writing_email_seconds": 420,
+    "writing_academic_discussion_seconds": 600,
+    "listen_repeat_group_seconds": 120,
+    "interview_response_seconds": 45,
+    "interview_preparation_seconds": 0,
+    "writing_editable_after_timeout": true,
+    "typing_display_refresh_hz": 10,
+    "typing_persist_minute_samples_only": true
+  },
+  "navigation_rules": {
+    "practice_can_return_to_seen_questions": true,
+    "listening_can_return": true,
+    "reading_modules_isolated": false,
+    "listening_modules_isolated": false,
+    "timeout_keeps_answer_editable": true
+  }
+}
