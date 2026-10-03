@@ -180,16 +180,9 @@ export function buildSessionRecordIndex(
     created_at: session.created_at,
     mode: session.mode,
     profile_id: session.timing_profile_id,
-    blueprint_id: session.blueprint_id,
-    blueprint_version: session.blueprint_version,
-    structure_mode: dynamic ? session.structure_mode : 'legacy_blueprint',
-    section_item_counts: dynamic
-      ? Object.fromEntries(session.dynamic_sections.map((section) => [section.section_id, section.item_ids.length]))
-      : undefined,
-    legacy_label: dynamic ? undefined : 'LEGACY V5',
-    selected_sections: dynamic
-      ? [...session.selected_sections]
-      : [...new Set(session.questions.map((question) => question.section_id))],
+    structure_mode: session.structure_mode,
+    section_item_counts: dynamic ? Object.fromEntries(session.dynamic_sections.map((section) => [section.section_id, section.item_ids.length])) : undefined,
+    selected_sections: [...(session.selected_sections ?? [])],
     active_time_ms: session.active_ms,
     pause_time_ms: session.paused_ms,
     completion_status: session.completed_at ? 'COMPLETED' : 'INCOMPLETE',

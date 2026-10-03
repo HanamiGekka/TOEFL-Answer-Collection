@@ -16,7 +16,7 @@ function base(mode: 'practice' | 'exam_simulation' = 'practice') {
   return createDynamicSession({
     session_id: `dynamic-${mode}`,
     package_id: '01.21.A.1',
-    source_path: 'readonly',
+    source_relative_path: 'readonly',
     mode,
     selected_sections: ['Reading', 'Listening', 'Writing'],
     created_at: '2026-08-03T01:00:00.000Z'

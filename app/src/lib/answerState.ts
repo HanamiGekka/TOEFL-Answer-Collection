@@ -1,14 +1,11 @@
-import type { AnswerMode, QuestionProgressStatus } from '../types';
+import type { QuestionProgressStatus } from '../types';
 import i18n from '../i18n';
 
-export function inferAnswerStatus(answerValue: unknown, mode: AnswerMode): QuestionProgressStatus {
+export function inferAnswerStatus(answerValue: unknown): QuestionProgressStatus {
   if (answerValue === null || answerValue === undefined) return 'ENCOUNTERED_UNANSWERED';
   if (typeof answerValue === 'string') return answerValue.trim() ? 'ANSWERED' : 'ENCOUNTERED_UNANSWERED';
   if (Array.isArray(answerValue)) {
     if (answerValue.length === 0) return 'ENCOUNTERED_UNANSWERED';
-    if (mode === 'word_blanks' && answerValue.some((value) => String(value).trim() === '')) {
-      return 'PARTIALLY_ANSWERED';
-    }
     return 'ANSWERED';
   }
   if (typeof answerValue === 'object') {

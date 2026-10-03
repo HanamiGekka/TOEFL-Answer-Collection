@@ -3,43 +3,23 @@ import type {
   DynamicItemTypeConfig,
   DynamicSectionName,
   EventLogEntry,
-  PackageSummary,
   PracticeMode,
   PracticeSession,
   SectionName,
   SessionNotice,
-  SpeakingTaskOutcome,
   WritingInputType
 } from '../types';
-import {
-  advanceFromCurrent,
-  canNavigateBackward,
-  canNavigateToQuestion,
-  createEvent,
-  enterQuestion,
-  finalizeCurrentScope as finalizeScope,
-  finalizeQuestion,
-  getCurrentModule,
-  getCurrentQuestion,
-  markUncertain,
-  previousQuestionInSession,
-  shouldQuestionBeOvertime,
-  skipAndAdvance,
-  skipQuestion,
-  upsertAnswer
-} from '../lib/sessionEngine';
+import { canNavigateToQuestion, createEvent, enterQuestion, finalizeQuestion, getCurrentQuestion, markUncertain, shouldQuestionBeOvertime, skipQuestion, upsertAnswer } from '../lib/sessionEngine';
 import {
   appendEvent,
   cleanupTerminalRecovery,
   getAppSetting,
   getRecoveryEventSeq,
-  loadBlueprintOverride,
   loadRecoveryEvents,
   loadRecoverySnapshot,
   openSessionExportDirectory,
   saveAppSetting,
   saveSessionSnapshot,
-  scanPackages
 } from '../lib/storage';
 import type { PersistenceReason } from '../lib/storage';
 import { exportSessionRecord } from '../lib/exporters';
@@ -57,34 +37,6 @@ import {
   startActivity,
   type ActivityTimer
 } from '../lib/timeLedger';
-import {
-  addCurrentTaskPause,
-  advanceAfterSpeakingTask,
-  applyTaskActivityDelta,
-  enterTask,
-  getCurrentTask,
-  getTaskTimingState,
-  getListenRepeatGroupTiming,
-  isLongWritingTask,
-  markTaskOvertimeEventRecorded,
-  markSpeakingTask,
-  MINIMUM_SPEAKING_TRANSITION_GUARD_MS,
-  pauseCurrentTask,
-  redoWritingText as redoWritingTextInSession,
-  resumeCurrentTask,
-  retrySpeakingTask,
-  speakingRetryTaskIdsInCurrentScope,
-  startSpeakingTask,
-  taskIdForQuestion,
-  undoWritingText as undoWritingTextInSession,
-  updateWritingText as updateWritingTextInSession
-} from '../lib/taskRuntime';
-import {
-  DEFAULT_BLUEPRINT,
-  mergeBlueprintOverride,
-  validateBlueprint,
-  type ToeflBlueprint
-} from '../lib/blueprint';
 import { prepareRecoverySession } from '../lib/recovery';
 import {
   defaultShortcutBindings,
@@ -113,6 +65,7 @@ import {
 } from '../lib/dynamicSession';
 import type { DynamicBatchBlock } from '../lib/dynamicSession';
 import { EMPTY_ITEM_TEMPLATES, canonicalTemplateRecipe, creationRecipeFromBlocks, normalizeTemplateName, parseItemTemplates, resolveTemplateBlocks, validateItemTemplate, type ItemBatchTemplate, type ItemBatchTemplateCollection, type ItemTemplateBlock } from '../lib/itemTemplate';
+import { validateTrainingName } from '../lib/trainingName';
 
 export interface DynamicItemDialogState {
   mode: 'create' | 'edit';
@@ -129,14 +82,9 @@ let eventPersistenceTail: Promise<void> = Promise.resolve();
 let eventPersistenceFailure: string | undefined;
 
 export interface AppState {
-  packages: PackageSummary[];
-  packageLoadError?: string;
-  blueprint: ToeflBlueprint;
-  blueprintStatus: 'ready' | 'loading' | 'error';
-  blueprintErrors: string[];
-  blueprintOverridePackageId?: string;
   shortcutBindings: ShortcutBindings;
-  selectedPackage?: PackageSummary;
+  trainingName: string;
+  setTrainingName: (name: string) => void;
   mode: PracticeMode;
   selectedSections: SectionName[];
   session?: PracticeSession;
@@ -147,12 +95,6 @@ export interface AppState {
   pausedMs: number;
   questionActiveMs: number;
   scopeActiveMs: number;
-  taskActiveMs: number;
-  taskRemainingMs: number | null;
-  speakingTransitionPending: boolean;
-  speakingTransitionGuardUntil: number;
-  speakingTransitionGuardTaskId?: string;
-  speakingTransitionGuardAttempt?: number;
   isPaused: boolean;
   hideTimes: boolean;
   navigationLockedUntil: number;
@@ -172,7 +114,6 @@ export interface AppState {
   templateMutationPending: boolean;
   lastCreationOperations: Partial<Record<DynamicSectionName, ItemTemplateBlock[]>>;
   initialize: () => Promise<void>;
-  selectPackage: (packageId: string) => void;
   saveShortcutBindings: (bindings: ShortcutBindings) => Promise<boolean>;
   setMode: (mode: PracticeMode) => void;
   toggleSection: (section: SectionName) => void;
@@ -193,23 +134,13 @@ export interface AppState {
   tick: () => void;
   togglePause: () => void;
   answerCurrent: (answer: unknown) => void;
-  updateWritingText: (text: string, inputType: WritingInputType) => void;
-  undoWritingText: () => boolean;
-  redoWritingText: () => boolean;
   updateWritingAnswerFromHistory: (text: string, inputType: 'historyUndo' | 'historyRedo') => boolean;
   updateDynamicLongText: (text: string, inputType: WritingInputType) => void;
   undoDynamicLongText: () => boolean;
   redoDynamicLongText: () => boolean;
-  startSpeakingCurrent: () => Promise<void>;
-  markSpeakingCurrent: (outcome: SpeakingTaskOutcome) => Promise<void>;
-  advanceSpeakingCurrent: () => Promise<void>;
-  retrySpeakingCurrent: () => Promise<void>;
   skipCurrent: () => void;
   nextQuestion: () => void;
-  finalizeCurrentScope: (options?: { allowSpeakingRetries?: boolean }) => Promise<void>;
-  finalizeCurrentModule: () => Promise<void>;
-  goToFirstSpeakingRetry: () => void;
-  confirmFinalizeWithSpeakingRetries: () => Promise<void>;
+  finalizeCurrentScope: () => Promise<void>;
   previousQuestion: () => void;
   goToQuestion: (index: number) => void;
   goToFirstUnencountered: () => void;
@@ -229,11 +160,7 @@ export interface AppState {
 let answerAutosaveTimer: number | undefined;
 
 export const useAppStore = create<AppState>((set, get) => ({
-  packages: [],
-  blueprint: DEFAULT_BLUEPRINT,
-  blueprintStatus: 'ready',
-  blueprintErrors: [],
-  blueprintOverridePackageId: undefined,
+  trainingName: '',
   shortcutBindings: defaultShortcutBindings(),
   events: [],
   eventSeq: 0,
@@ -243,10 +170,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   pausedMs: 0,
   questionActiveMs: 0,
   scopeActiveMs: 0,
-  taskActiveMs: 0,
-  taskRemainingMs: null,
-  speakingTransitionPending: false,
-  speakingTransitionGuardUntil: 0,
   isPaused: false,
   hideTimes: false,
   navigationLockedUntil: 0,
@@ -264,13 +187,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   lastCreationOperations: {},
 
   async initialize() {
-    let packages: PackageSummary[] = [];
-    let packageLoadError: string | undefined;
-    try {
-      packages = await scanPackages();
-    } catch (error) {
-      packageLoadError = String(error);
-    }
     try {
       let savedShortcuts: Partial<ShortcutBindings> | undefined;
       try {
@@ -281,30 +197,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       const shortcuts = migrateShortcutBindings(savedShortcuts);
       const shortcutBindings = validateShortcutBindings(shortcuts).ok ? shortcuts : defaultShortcutBindings();
       set({
-        packages,
-        selectedPackage: packages[0],
         shortcutBindings,
-        packageLoadError,
-        blueprintStatus: 'ready',
-        blueprintErrors: [],
-        blueprintOverridePackageId: undefined,
         lastCreationOperations: {}
       });
       await get().loadItemTemplates();
-    } catch (error) {
-      set({ packages, selectedPackage: packages[0], packageLoadError: packageLoadError ?? String(error) });
+    } catch {
+      set({ shortcutBindings: defaultShortcutBindings() });
     }
   },
 
-  selectPackage(packageId) {
-    const selected = get().packages.find((item) => item.package_id === packageId);
-    if (!selected) return;
-    set({
-      selectedPackage: selected,
-      blueprintStatus: 'ready',
-      blueprintErrors: [],
-      blueprintOverridePackageId: undefined
-    });
+  setTrainingName(trainingName) {
+    set({ trainingName });
   },
 
   async saveShortcutBindings(bindings) {
@@ -321,19 +224,18 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   toggleSection(section) {
-    if (section === 'Speaking') return;
     set((state) => {
       const selected = state.selectedSections.includes(section)
         ? state.selectedSections.filter((item) => item !== section)
         : [...state.selectedSections, section];
-      return { selectedSections: selected.length === 0 ? [section] : selected };
+      return { selectedSections: selected };
     });
   },
 
   startSession() {
     const state = get();
-    const selectedPackage = state.selectedPackage;
-    if (!selectedPackage) return;
+    const validatedName = validateTrainingName(state.trainingName);
+    if (validatedName.error || state.selectedSections.length === 0) return;
     if (answerAutosaveTimer !== undefined && typeof window !== 'undefined') {
       window.clearTimeout(answerAutosaveTimer);
       answerAutosaveTimer = undefined;
@@ -341,11 +243,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     const now = new Date().toISOString();
     const selectedSet = new Set(get().selectedSections);
     const selectedSections = NEW_SESSION_SECTION_ORDER.filter((section) => selectedSet.has(section));
-    const sessionId = `${selectedPackage.package_id}-${Date.now()}`;
+    const sessionId = `session-${crypto.randomUUID()}`;
     const runtimeSession = createDynamicSession({
       session_id: sessionId,
-      package_id: selectedPackage.package_id,
-      source_relative_path: selectedPackage.source_relative_path ?? selectedPackage.package_id,
+      package_id: validatedName.name,
       mode: get().mode,
       created_at: now,
       selected_sections: selectedSections
@@ -359,12 +260,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       pausedMs: 0,
       questionActiveMs: 0,
       scopeActiveMs: 0,
-      taskActiveMs: 0,
-      taskRemainingMs: null,
-      speakingTransitionPending: false,
-      speakingTransitionGuardUntil: 0,
-      speakingTransitionGuardTaskId: undefined,
-      speakingTransitionGuardAttempt: undefined,
       isPaused: false,
       navigationLockedUntil: 0,
       windowClosePhase: 'IDLE',
@@ -688,32 +583,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         recoveryLoadStep('RECOVERY_EVENT_SEQ_LOAD_FAILED', getRecoveryEventSeq(sessionId)),
         recoveryLoadStep('RECOVERY_EVENTS_LOAD_FAILED', loadRecoveryEvents(sessionId))
       ]);
-      const prepared = prepareRecoverySession(raw, [DEFAULT_BLUEPRINT.blueprint_id, get().blueprint.blueprint_id]);
+      const prepared = prepareRecoverySession(raw);
       if (!prepared.ok) return { ok: false, error: `${prepared.code}: ${prepared.diagnostic}` };
       const recoveredEventSeq = historicEvents.reduce(
         (maximum, event) => Math.max(maximum, event.seq),
         eventSeq
       );
-      let recoveryBlueprint = DEFAULT_BLUEPRINT;
-      if (prepared.session.blueprint_override_package_id) {
-        const requiredOverride = await loadBlueprintOverride(prepared.session.blueprint_override_package_id);
-        if (!requiredOverride) {
-          return {
-            ok: false,
-            error: `PACKAGE_OVERRIDE_MISSING: ${prepared.session.blueprint_override_package_id}`
-          };
-        }
-        recoveryBlueprint = mergeBlueprintOverride(
-          DEFAULT_BLUEPRINT,
-          requiredOverride,
-          prepared.session.blueprint_override_package_id
-        );
-        const recoveryValidation = validateBlueprint(recoveryBlueprint);
-        if (!recoveryValidation.ok) {
-          return { ok: false, error: `PACKAGE_OVERRIDE_INVALID: ${recoveryValidation.errors.map((item) => item.message).join('; ')}` };
-        }
-      }
-      const recovered = applyDerivedTiming(pauseCurrentTask(prepared.session));
+      const recovered = applyDerivedTiming(prepared.session);
       const now = nowMonotonic();
       const pausedTimer = pauseActivityTimer(
         createActivityTimer(recovered.current_question_id, now, recovered.paused_ms),
@@ -722,19 +598,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({
         session: recovered,
         lastCreationOperations: {},
-        blueprint: recoveryBlueprint,
-        blueprintStatus: 'ready',
-        blueprintErrors: [],
-        blueprintOverridePackageId: prepared.session.blueprint_override_package_id,
-        selectedPackage: get().packages.find((item) => item.package_id === recovered.package_id) ?? get().selectedPackage,
         events: historicEvents,
         eventSeq: recoveredEventSeq,
         timer: pausedTimer,
         ...timingStateFromSettledSession(recovered, recovered.paused_ms),
-        speakingTransitionPending: false,
-        speakingTransitionGuardUntil: 0,
-        speakingTransitionGuardTaskId: undefined,
-        speakingTransitionGuardAttempt: undefined,
         isPaused: true,
         navigationLockedUntil: 0,
         windowClosePhase: 'IDLE',
@@ -745,9 +612,7 @@ export const useAppStore = create<AppState>((set, get) => ({
               message: 'The recovered record contains historical non-English Writing content.',
               messageKey: 'notice.legacyWriting'
             }
-          : prepared.migrated
-            ? { kind: 'warning', message: 'Legacy recovery migrated; review the paused session before continuing.', messageKey: 'notice.legacyRecovery' }
-            : undefined,
+          : undefined,
         saveStatus: 'saving',
         saveError: undefined,
         exportStatus: 'idle',
@@ -774,14 +639,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!state.timer || !state.session) return;
     const now = nowMonotonic();
     const live = calculateLiveTimingState(state.session, state.timer, now);
-    const task = getCurrentTask(state.session);
-    if (task && live.taskRemainingMs === 0 && !task.is_overtime) {
-      const settled = settleCurrentActivity(state, now);
-      set(settled);
-    } else {
-      set(live);
-    }
-    recordPendingTaskOvertimeEvent();
+    set(live);
     recordPendingDynamicOvertimeEvent();
   },
 
@@ -793,7 +651,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const now = nowMonotonic();
     if (timer.pausedAtMonotonic === null) {
       const paused = pauseActivityTimer(timer, now);
-      const session = pauseCurrentTask(applyActivityDelta(state.session, paused.activityId, paused.deltaMs));
+      const session = applyActivityDelta(state.session, paused.activityId, paused.deltaMs);
       const timing = calculateLiveTimingState(session, paused.timer, now);
       set({
         session,
@@ -805,13 +663,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     } else {
       const pausedDelta = Math.max(0, now - timer.pausedAtMonotonic);
       const resumedTimer = resumeActivityTimer(timer, now);
-      const withPause = isDynamicSession(state.session)
-        ? addDynamicPauseTime(state.session, state.session.current_question_id, pausedDelta)
-        : addCurrentTaskPause(state.session, pausedDelta);
-      const session = applyDerivedTiming({
-        ...resumeCurrentTask(withPause),
-        paused_ms: resumedTimer.pausedMs
-      });
+      const withPause = addDynamicPauseTime(state.session as DynamicPracticeSession, state.session.current_question_id, pausedDelta);
+      const session = applyDerivedTiming({ ...withPause, paused_ms: resumedTimer.pausedMs });
       const nextTimer = applyActivityStartPolicy(resumedTimer, session, now);
       set({
         session,
@@ -831,26 +684,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const settled = settleCurrentActivity(state, now);
     const question = getCurrentQuestion(settled.session);
     if (!question) return;
-    const task = getCurrentTask(settled.session);
-    const writingBuildSentence = task?.task_id === 'WRITING_BUILD_SENTENCE' && typeof answer === 'string';
-    const dynamicItem = isDynamicSession(settled.session) ? question : undefined;
-    const acceptedAnswer = dynamicItem
-      ? normalizeDynamicAnswer(dynamicItem, answer)
-      : writingBuildSentence
-      ? sanitizeWritingText(answer, { allow_line_breaks: false }).text
-      : answer;
+    const acceptedAnswer = normalizeDynamicAnswer(question, answer);
     if (acceptedAnswer === DYNAMIC_ANSWER_REJECTED) return;
-    if (
-      writingBuildSentence &&
-      String(settled.session.answers[question.id]?.answer_value ?? '') === acceptedAnswer
-    ) {
-      set({
-        session: settled.session,
-        timer: settled.timer,
-        ...calculateLiveTimingState(settled.session, settled.timer, now)
-      });
-      return;
-    }
     const updated = applyDerivedTiming(upsertAnswer(
       settled.session,
       question,
@@ -867,17 +702,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       timer: settled.timer,
       ...calculateLiveTimingState(updated, settled.timer, now)
     });
-    recordEvent(dynamicItem ? 'item_answer_changed' : 'answer_changed', dynamicItem
-      ? {
-          item_id: question.id,
-          renderer: question.renderer,
-          modification_count: updated.answers[question.id]?.modification_count ?? 0
-        }
-      : {
-          question_id: question.id,
-          answer_mode: question.answer_mode,
-          modification_count: updated.answers[question.id]?.modification_count ?? 0
-        });
+    recordEvent('item_answer_changed', { item_id: question.id, renderer: question.renderer, modification_count: updated.answers[question.id]?.modification_count ?? 0 });
     scheduleAnswerAutosave();
   },
 
@@ -898,52 +723,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     return mutateDynamicLongTextState(get, set, redoDynamicWritingText, 'historyRedo');
   },
 
-  updateWritingText(text, inputType) {
-    const state = get();
-    if (isInteractionFrozen(state) || !state.session || !state.timer) return;
-    const now = nowMonotonic();
-    const settled = settleCurrentActivity(state, now);
-    const edited = updateWritingTextInSession(settled.session, text, inputType);
-    if (edited === settled.session) {
-      set({
-        session: settled.session,
-        timer: settled.timer,
-        ...calculateLiveTimingState(settled.session, settled.timer, now)
-      });
-      return;
-    }
-    const updated = applyDerivedTiming(edited);
-    set({
-      session: updated,
-      timer: settled.timer,
-      ...calculateLiveTimingState(updated, settled.timer, now)
-    });
-    const task = getCurrentTask(updated);
-    recordEvent('writing_text_changed', {
-      task_id: task?.task_id,
-      input_type: inputType,
-      word_count: task?.word_count ?? 0,
-      character_count: task?.character_count ?? 0,
-      modification_count: task?.modification_count ?? 0
-    });
-    scheduleAnswerAutosave();
-  },
-
-  undoWritingText() {
-    return mutateWritingSession(get, set, undoWritingTextInSession, 'writing_undo');
-  },
-
-  redoWritingText() {
-    return mutateWritingSession(get, set, redoWritingTextInSession, 'writing_redo');
-  },
-
   updateWritingAnswerFromHistory(text, inputType) {
     const state = get();
     if (isInteractionFrozen(state) || state.sessionNotice || !state.session || !state.timer) return false;
-    const task = getCurrentTask(state.session);
     const question = getCurrentQuestion(state.session);
-    const scope = state.session.modules.find((item) => item.id === state.session?.current_scope_id);
-    if (task?.task_id !== 'WRITING_BUILD_SENTENCE' || !question || scope?.status === 'FINALIZED') return false;
+    if (!question || question.renderer !== 'short_text' || !canNavigateToQuestion(state.session, question.id)) return false;
     const now = nowMonotonic();
     const settled = settleCurrentActivity(state, now);
     const prior = settled.session.answers[question.id];
@@ -994,220 +778,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     return true;
   },
 
-  async startSpeakingCurrent() {
-    const state = get();
-    if (isInteractionFrozen(state) || state.speakingTransitionPending || !state.session || !state.timer) return;
-    const task = getCurrentTask(state.session);
-    if (!task || task.section_id !== 'Speaking') return;
-    const now = nowMonotonic();
-    const session = startSpeakingTask(state.session, task.task_id);
-    if (session === state.session) return;
-    const timer = startActivity(state.timer, state.session.current_question_id, now);
-    const startedTask = session.tasks.find((item) => item.task_id === task.task_id);
-    set({
-      session,
-      timer,
-      ...calculateLiveTimingState(session, timer, now),
-      speakingTransitionPending: true,
-      speakingTransitionGuardUntil: now + MINIMUM_SPEAKING_TRANSITION_GUARD_MS,
-      speakingTransitionGuardTaskId: task.task_id,
-      speakingTransitionGuardAttempt: startedTask?.attempt_count,
-      saveStatus: 'saving',
-      sessionNotice: undefined
-    });
-    recordEvent('speaking_task_started', {
-      task_id: task.task_id,
-      attempt_count: startedTask?.attempt_count ?? 0
-    });
-    try {
-      await saveSessionSnapshot(serializeSessionForPersistence(session));
-      set({ speakingTransitionPending: false, saveStatus: 'saved' });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      set({
-        speakingTransitionPending: false,
-        saveStatus: 'error',
-        sessionNotice: { kind: 'error', message: `Speaking task started but save failed: ${message}`, messageKey: 'notice.speakingStartSaveFailed', messageValues: { detail: message } }
-      });
-      recordEvent('speaking_task_persistence_error', { task_id: task.task_id, phase: 'start', message });
-    }
-  },
-
-  async markSpeakingCurrent(outcome) {
-    const state = get();
-    if (isInteractionFrozen(state) || state.speakingTransitionPending || !state.session || !state.timer) return;
-    const now = nowMonotonic();
-    const guardedTask = getCurrentTask(state.session);
-    if (!guardedTask || guardedTask.section_id !== 'Speaking') return;
-    if (
-      state.speakingTransitionGuardTaskId === guardedTask.task_id &&
-      state.speakingTransitionGuardAttempt === guardedTask.attempt_count &&
-      now < state.speakingTransitionGuardUntil
-    ) return;
-    const settled = settleCurrentActivity(state, now);
-    const task = getCurrentTask(settled.session);
-    if (!task || task.section_id !== 'Speaking' || !['ACTIVE', 'OVERTIME'].includes(task.status)) return;
-    const marked = ['ACTIVE', 'OVERTIME'].includes(task.status)
-      ? markSpeakingTask(settled.session, task.task_id, outcome)
-      : settled.session;
-    const suspendedTimer = { ...settled.timer, currentActivityStartedAtMonotonic: null };
-    set({
-      session: marked,
-      timer: suspendedTimer,
-      ...calculateLiveTimingState(marked, suspendedTimer, now),
-      speakingTransitionPending: true,
-      saveStatus: 'saving'
-    });
-    try {
-      await saveSessionSnapshot(serializeSessionForPersistence(marked));
-      const transitioned = outcome === 'COMPLETED'
-        ? applyDerivedTiming(advanceAfterSpeakingTask(marked))
-        : applyDerivedTiming(marked);
-      await saveSessionSnapshot(serializeSessionForPersistence(transitioned));
-      const switched = transitioned.current_question_id !== marked.current_question_id;
-      const transitionNow = nowMonotonic();
-      const nextTimer = applyActivityStartPolicy(
-        switched ? startActivity(settled.timer, transitioned.current_question_id, transitionNow) : suspendedTimer,
-        transitioned,
-        transitionNow
-      );
-      const nextTask = getCurrentTask(transitioned);
-      const nextGuarded = nextTask?.section_id === 'Speaking' && ['ACTIVE', 'OVERTIME'].includes(nextTask.status);
-      set({
-        session: transitioned,
-        timer: nextTimer,
-        ...calculateLiveTimingState(transitioned, nextTimer, transitionNow),
-        speakingTransitionPending: false,
-        speakingTransitionGuardUntil: nextGuarded ? transitionNow + MINIMUM_SPEAKING_TRANSITION_GUARD_MS : 0,
-        speakingTransitionGuardTaskId: nextGuarded ? nextTask?.task_id : undefined,
-        speakingTransitionGuardAttempt: nextGuarded ? nextTask?.attempt_count : undefined,
-        saveStatus: 'saved',
-        sessionNotice: undefined
-      });
-      recordEvent('speaking_task_result', {
-        task_id: task.task_id,
-        outcome,
-        attempt_count: marked.tasks.find((item) => item.task_id === task.task_id)?.attempt_count ?? 0,
-        is_overtime: marked.tasks.find((item) => item.task_id === task.task_id)?.is_overtime ?? false
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      set({
-        session: marked,
-        timer: suspendedTimer,
-        speakingTransitionPending: false,
-        saveStatus: 'error',
-        sessionNotice: { kind: 'error', message: `Save failed; Speaking task did not change: ${message}`, messageKey: 'notice.speakingSwitchSaveFailed', messageValues: { detail: message } }
-      });
-      recordEvent('speaking_task_persistence_error', { task_id: task.task_id, message });
-    }
-  },
-
-  async advanceSpeakingCurrent() {
-    const state = get();
-    if (isInteractionFrozen(state) || state.speakingTransitionPending || !state.session || !state.timer) return;
-    const currentTask = getCurrentTask(state.session);
-    if (
-      !currentTask ||
-      currentTask.section_id !== 'Speaking' ||
-      !['COMPLETED', 'NEEDS_RETRY'].includes(currentTask.status)
-    ) return;
-    const now = nowMonotonic();
-    const settled = settleCurrentActivity(state, now);
-    const transitioned = applyDerivedTiming(advanceAfterSpeakingTask(settled.session));
-    if (transitioned.current_question_id === settled.session.current_question_id) return;
-    const suspendedTimer = { ...settled.timer, currentActivityStartedAtMonotonic: null };
-    set({
-      session: settled.session,
-      timer: suspendedTimer,
-      ...calculateLiveTimingState(settled.session, suspendedTimer, now),
-      speakingTransitionPending: true,
-      saveStatus: 'saving',
-      sessionNotice: undefined
-    });
-    try {
-      await saveSessionSnapshot(serializeSessionForPersistence(transitioned));
-      const transitionNow = nowMonotonic();
-      const nextTimer = applyActivityStartPolicy(
-        startActivity(settled.timer, transitioned.current_question_id, transitionNow),
-        transitioned,
-        transitionNow
-      );
-      const nextTask = getCurrentTask(transitioned);
-      const nextGuarded = nextTask?.section_id === 'Speaking' && ['ACTIVE', 'OVERTIME'].includes(nextTask.status);
-      set({
-        session: transitioned,
-        timer: nextTimer,
-        ...calculateLiveTimingState(transitioned, nextTimer, transitionNow),
-        speakingTransitionPending: false,
-        speakingTransitionGuardUntil: nextGuarded ? transitionNow + MINIMUM_SPEAKING_TRANSITION_GUARD_MS : 0,
-        speakingTransitionGuardTaskId: nextGuarded ? nextTask?.task_id : undefined,
-        speakingTransitionGuardAttempt: nextGuarded ? nextTask?.attempt_count : undefined,
-        saveStatus: 'saved',
-        sessionNotice: undefined
-      });
-      recordEvent('speaking_task_advanced', {
-        from_task_id: currentTask.task_id,
-        to_task_id: nextTask?.task_id
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      set({
-        speakingTransitionPending: false,
-        saveStatus: 'error',
-        sessionNotice: { kind: 'error', message: `Save failed; Speaking task did not change: ${message}`, messageKey: 'notice.speakingSwitchSaveFailed', messageValues: { detail: message } }
-      });
-      recordEvent('speaking_task_persistence_error', {
-        task_id: currentTask.task_id,
-        phase: 'advance',
-        message
-      });
-    }
-  },
-
-  async retrySpeakingCurrent() {
-    const state = get();
-    if (isInteractionFrozen(state) || state.speakingTransitionPending || !state.session || !state.timer) return;
-    const task = getCurrentTask(state.session);
-    if (!task || task.section_id !== 'Speaking' || !task.needs_retry) return;
-    const now = nowMonotonic();
-    const session = retrySpeakingTask(state.session, task.task_id);
-    if (session === state.session) return;
-    const timer = startActivity(state.timer, state.session.current_question_id, now);
-    const retriedTask = session.tasks.find((item) => item.task_id === task.task_id);
-    set({
-      session,
-      timer,
-      ...calculateLiveTimingState(session, timer, now),
-      speakingTransitionPending: true,
-      speakingTransitionGuardUntil: now + MINIMUM_SPEAKING_TRANSITION_GUARD_MS,
-      speakingTransitionGuardTaskId: task.task_id,
-      speakingTransitionGuardAttempt: retriedTask?.attempt_count,
-      saveStatus: 'saving',
-      sessionNotice: undefined
-    });
-    recordEvent('speaking_task_retried', {
-      task_id: task.task_id,
-      attempt_count: retriedTask?.attempt_count ?? 0
-    });
-    try {
-      await saveSessionSnapshot(serializeSessionForPersistence(session));
-      set({ speakingTransitionPending: false, saveStatus: 'saved' });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      set({
-        speakingTransitionPending: false,
-        saveStatus: 'error',
-        sessionNotice: { kind: 'error', message: `Speaking retry started but save failed: ${message}`, messageKey: 'notice.speakingRetrySaveFailed', messageValues: { detail: message } }
-      });
-      recordEvent('speaking_task_persistence_error', { task_id: task.task_id, phase: 'retry', message });
-    }
-  },
-
   skipCurrent() {
     const state = get();
     if (isInteractionFrozen(state) || !state.session || isNavigationLocked(state.navigationLockedUntil)) return;
-    if (isLongWritingTask(getCurrentTask(state.session))) return;
     const question = getCurrentQuestion(state.session);
     if (!question) return;
     if (isDynamicSession(state.session)) {
@@ -1236,22 +809,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       void get().persist();
       return;
     }
-    lockNavigation(set);
-    const now = nowMonotonic();
-    const settled = settleCurrentActivity(state, now);
-    const questionActiveMs = settled.session.answers[question.id]?.active_time_ms ?? 0;
-    const result = skipAndAdvance(settled.session, questionActiveMs);
-    const target = getCurrentQuestion(result.session);
-    setNavigationResult(set, settled, result.session, target?.id !== question.id, now);
-    recordEvent('question_skipped', { question_id: question.id, active_time_ms: Math.round(questionActiveMs) });
-    if (target?.id !== question.id) recordQuestionEntered(target?.id, 'skip');
-    void get().persist();
   },
 
   nextQuestion() {
     const state = get();
     if (isInteractionFrozen(state) || !state.session || isNavigationLocked(state.navigationLockedUntil)) return;
-    if (isLongWritingTask(getCurrentTask(state.session))) return;
     const question = getCurrentQuestion(state.session);
     if (isDynamicSession(state.session)) {
       if (!question) {
@@ -1279,162 +841,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       void get().persist();
       return;
     }
-    if (!question) return;
-    lockNavigation(set);
-    const now = nowMonotonic();
-    const settled = settleCurrentActivity(state, now);
-    const questionActiveMs = settled.session.answers[question.id]?.active_time_ms ?? 0;
-    const result = advanceFromCurrent(settled.session, questionActiveMs);
-    const target = getCurrentQuestion(result.session);
-    setNavigationResult(set, settled, result.session, target?.id !== question.id, now);
-    if (target?.id !== question.id) recordQuestionEntered(target?.id, 'next');
-    void get().persist();
   },
 
-  async finalizeCurrentScope(options) {
-    const state = get();
-    if (isInteractionFrozen(state) || state.speakingTransitionPending || !state.session) return;
-    const speakingRetryTaskIds = speakingRetryTaskIdsInCurrentScope(state.session);
-    if (speakingRetryTaskIds.length > 0 && !options?.allowSpeakingRetries) {
-      set({
-        sessionNotice: {
-          kind: 'warning',
-          message: 'Speaking tasks still need retry.',
-          messageKey: 'notice.speakingNeedsRetry',
-          messageValues: { count: speakingRetryTaskIds.length },
-          taskIds: speakingRetryTaskIds,
-          retryAction: 'CONFIRM_SPEAKING_RETRIES'
-        }
-      });
-      recordEvent('scope_finalize_blocked_speaking_retries', {
-        module_id: state.session.current_scope_id,
-        task_ids: speakingRetryTaskIds
-      });
-      return;
-    }
-    const settledAt = nowMonotonic();
-    const settled = settleCurrentActivity(state, settledAt);
-    const question = getCurrentQuestion(settled.session);
-    const scope = getCurrentModule(settled.session);
-    if (!question || !scope) return;
-    const suspendedTimer = { ...settled.timer, currentActivityStartedAtMonotonic: null };
-    set({
-      session: settled.session,
-      timer: suspendedTimer,
-      ...calculateLiveTimingState(settled.session, suspendedTimer, settledAt),
-      saveStatus: 'saving',
-      saveError: undefined,
-      speakingTransitionPending: scope.section === 'Speaking'
-    });
-    const questionActiveMs = settled.session.answers[question.id]?.active_time_ms ?? 0;
-    const result = await finalizeScope(
-      settled.session,
-      questionActiveMs,
-      async (snapshot) => saveSessionSnapshot(serializeSessionForPersistence(snapshot)),
-      new Date().toISOString()
-    );
-    const resumedAt = nowMonotonic();
-    const nextSession = applyDerivedTiming(result.session);
-    const timer =
-      nextSession.view === 'SESSION_SUMMARY'
-        ? undefined
-        : applyActivityStartPolicy(
-            startActivity(settled.timer, nextSession.current_question_id, resumedAt),
-            nextSession,
-            resumedAt
-          );
-    const timing = timer
-      ? calculateLiveTimingState(nextSession, timer, resumedAt)
-      : timingStateFromSettledSession(nextSession, currentPausedMs(settled.timer, resumedAt));
-    set({
-      session: nextSession,
-      timer,
-      ...timing,
-      speakingTransitionPending: false
-    });
+  async finalizeCurrentScope() { await get().finishDynamicCurrentSection(false); },
 
-    if (result.ok) {
-      set({ saveStatus: 'saved', sessionNotice: undefined });
-      recordEvent('scope_finalized', {
-        question_id: question.id,
-        section_id: scope.section,
-        module_id: result.finalizedScopeId,
-        next: result.next
-      });
-      if (result.next === 'SESSION_SUMMARY') {
-        recordEvent('session_completed', { completed_sections: nextSession.completed_sections ?? [] });
-        await get().exportSession();
-      } else {
-        recordQuestionEntered(nextSession.current_question_id, 'scope_transition');
-      }
-    } else if (result.reason === 'UNENCOUNTERED_ITEMS') {
-      set({
-        saveStatus: 'saved',
-        sessionNotice: {
-          kind: 'warning',
-          message: 'This scope still has unvisited questions.',
-          messageKey: 'notice.unvisitedQuestions',
-          messageValues: { count: result.questionIds.length },
-          questionIds: result.questionIds
-        }
-      });
-      recordEvent('scope_finalize_blocked_unencountered', {
-        module_id: scope.id,
-        question_ids: result.questionIds
-      });
-    } else {
-      set({
-        saveStatus: 'error',
-        sessionNotice: {
-          kind: 'error',
-          message: `Save failed; current scope remains unfinished: ${result.message}`,
-          messageKey: 'notice.scopeSaveFailed',
-          messageValues: { detail: result.message },
-          retryAction: 'FINALIZE_SCOPE'
-        }
-      });
-      recordEvent('scope_finalize_persistence_error', { module_id: scope.id, message: result.message });
-    }
-  },
-
-  async finalizeCurrentModule() {
-    await get().finalizeCurrentScope();
-  },
-
-  goToFirstSpeakingRetry() {
-    const state = get();
-    if (isInteractionFrozen(state) || state.speakingTransitionPending || !state.session || !state.timer) return;
-    const taskId = state.sessionNotice?.taskIds?.[0] ?? speakingRetryTaskIdsInCurrentScope(state.session)[0];
-    if (!taskId) return;
-    const now = nowMonotonic();
-    const settled = settleCurrentActivity(state, now);
-    const entered = enterTask(settled.session, taskId);
-    if (entered.current_task_id !== taskId) return;
-    const timer = applyActivityStartPolicy(
-      startActivity(settled.timer, entered.current_question_id, now),
-      entered,
-      now
-    );
-    set({
-      session: entered,
-      timer,
-      ...calculateLiveTimingState(entered, timer, now),
-      sessionNotice: undefined
-    });
-    recordEvent('speaking_retry_review_selected', { task_id: taskId });
-    void get().persist();
-  },
-
-  async confirmFinalizeWithSpeakingRetries() {
-    const notice = get().sessionNotice;
-    if (notice?.retryAction !== 'CONFIRM_SPEAKING_RETRIES') return;
-    await get().finalizeCurrentScope({ allowSpeakingRetries: true });
-  },
 
   previousQuestion() {
     const state = get();
     if (isInteractionFrozen(state) || !state.session) return;
-    if (isLongWritingTask(getCurrentTask(state.session))) return;
     const current = getCurrentQuestion(state.session);
     if (!current) return;
     if (isDynamicSession(state.session)) {
@@ -1448,17 +862,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       void get().persist();
       return;
     }
-    if (!canNavigateBackward(state.session)) return;
-    const currentPosition = state.session.active_scope_question_ids.indexOf(current.id);
-    const targetId = state.session.active_scope_question_ids[Math.max(0, currentPosition - 1)];
-    if (!targetId || !canNavigateToQuestion(state.session, targetId, 'previous')) return;
-    const now = nowMonotonic();
-    const settled = settleCurrentActivity(state, now);
-    const nextSession = previousQuestionInSession(settled.session);
-    if (nextSession.current_question_id === state.session.current_question_id) return;
-    setNavigationResult(set, settled, nextSession, true, now);
-    recordQuestionEntered(nextSession.current_question_id, 'previous');
-    void get().persist();
   },
 
   goToQuestion(index) {
@@ -1472,7 +875,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     ) {
       return;
     }
-    if (isLongWritingTask(getCurrentTask(state.session))) return;
     const target = state.session.questions[index];
     if (isDynamicSession(state.session)) {
       if (!state.timer) return;
@@ -1486,7 +888,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
     if (!canNavigateToQuestion(state.session, target.id, 'answer_card')) return;
-    lockNavigation(set);
     const now = nowMonotonic();
     const settled = settleCurrentActivity(state, now);
     const nextSession = enterQuestion(settled.session, target.id, new Date().toISOString(), 'answer_card');
@@ -1511,7 +912,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   toggleReview() {
     const state = get();
     if (isInteractionFrozen(state) || !state.session) return;
-    if (isLongWritingTask(getCurrentTask(state.session))) return;
     const question = getCurrentQuestion(state.session);
     if (!question) return;
     const existing = state.session.answers[question.id];
@@ -1639,12 +1039,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       pausedMs: 0,
       questionActiveMs: 0,
       scopeActiveMs: 0,
-      taskActiveMs: 0,
-      taskRemainingMs: null,
-      speakingTransitionPending: false,
-      speakingTransitionGuardUntil: 0,
-      speakingTransitionGuardTaskId: undefined,
-      speakingTransitionGuardAttempt: undefined,
       isPaused: false,
       sessionNotice: undefined,
       dynamicItemDialog: undefined,
@@ -1684,7 +1078,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const paused = pauseActivityTimer(state.timer, now);
     const session = applyDerivedTiming({
-      ...pauseCurrentTask(applyActivityDelta(state.session, paused.activityId, paused.deltaMs)),
+      ...applyActivityDelta(state.session, paused.activityId, paused.deltaMs),
       paused_ms: currentPausedMs(paused.timer, now)
     });
     const preCloseRuntimeState = { kind: 'ACTIVE_SESSION' } as const;
@@ -1712,13 +1106,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         ? 0
         : Math.max(0, now - state.timer.pausedAtMonotonic);
       const resumedTimer = resumeActivityTimer(state.timer, now);
-      const withPause = isDynamicSession(state.session)
-        ? addDynamicPauseTime(state.session, state.session.current_question_id, pauseDelta)
-        : addCurrentTaskPause(state.session, pauseDelta);
-      const session = applyDerivedTiming({
-        ...resumeCurrentTask(withPause),
-        paused_ms: resumedTimer.pausedMs
-      });
+      const withPause = addDynamicPauseTime(state.session as DynamicPracticeSession, state.session.current_question_id, pauseDelta);
+      const session = applyDerivedTiming({ ...withPause, paused_ms: resumedTimer.pausedMs });
       const timer = applyActivityStartPolicy(resumedTimer, session, now);
       set({
         session,
@@ -1827,22 +1216,12 @@ function recordQuestionEntered(questionId: string | undefined, via: string): voi
   const session = useAppStore.getState().session;
   const question = session?.questions.find((item) => item.id === questionId);
   if (!session || !question) return;
-  if (isDynamicSession(session)) {
-    recordEvent('item_entered', {
-      item_id: question.id,
-      section_id: question.section_id,
-      visit_count: question.visit_count,
-      via
-    });
-  } else {
-    recordEvent('question_entered', {
-      question_id: question.id,
-      section_id: question.section_id,
-      module_id: question.module_id,
-      visit_count: question.visit_count,
-      via
-    });
-  }
+  recordEvent('item_entered', {
+    item_id: question.id,
+    section_id: question.section_id,
+    visit_count: question.visit_count,
+    via
+  });
 }
 
 function recordEvent(eventType: string, payload: Record<string, unknown>): void {
@@ -1878,8 +1257,6 @@ interface SettledStoreTiming {
   pausedMs: number;
   questionActiveMs: number;
   scopeActiveMs: number;
-  taskActiveMs: number;
-  taskRemainingMs: number | null;
 }
 
 function settleCurrentActivity(state: AppState, now: number): SettledStoreTiming {
@@ -1901,67 +1278,18 @@ function settleCurrentActivity(state: AppState, now: number): SettledStoreTiming
 function applyActivityDelta(session: PracticeSession, activityId: string, deltaMs: number): PracticeSession {
   const question = session.questions.find((item) => item.id === activityId);
   if (!question || deltaMs <= 0) return applyDerivedTiming(session);
-  if (taskIdForQuestion(question)) {
-    return applyDerivedTiming(applyTaskActivityDelta(session, activityId, deltaMs));
-  }
   const activeTimeMs = (session.answers[activityId]?.active_time_ms ?? 0) + Math.max(0, deltaMs);
-  return applyDerivedTiming(
-    finalizeQuestion(
-      session,
-      question,
-      activeTimeMs,
-      shouldQuestionBeOvertime(session, question, activeTimeMs)
-    )
-  );
+  return applyDerivedTiming(finalizeQuestion(session, question, activeTimeMs, shouldQuestionBeOvertime(session, question, activeTimeMs)));
 }
 
-function calculateLiveTimingState(
-  session: PracticeSession,
-  timer: RuntimeTimer,
-  now: number
-): Pick<AppState, 'activeMs' | 'pausedMs' | 'questionActiveMs' | 'scopeActiveMs' | 'taskActiveMs' | 'taskRemainingMs'> {
-  const task = getCurrentTask(session);
-  const rawLiveDelta = previewActivityDelta(timer, now);
-  const capAtLimit = task && task.remaining_ms !== null &&
-    ((task.section_id === 'Writing' && session.mode === 'exam_simulation') || task.task_id.startsWith('SI'));
-  const liveDelta = capAtLimit ? Math.min(rawLiveDelta, task.remaining_ms ?? rawLiveDelta) : rawLiveDelta;
-  const ledger = deriveTimingLedger(session, {
-    activityId: timer.currentActivityId,
-    deltaMs: liveDelta
-  });
-  const listenRepeat = task?.task_id.startsWith('SR') ? getListenRepeatGroupTiming(session) : undefined;
-  const taskTiming = task && isLongWritingTask(task)
-    ? getTaskTimingState(task, ledger.tasks[task.task_id] ?? task.active_time_ms)
-    : undefined;
-  return {
-    activeMs: ledger.sessionActiveMs,
-    pausedMs: currentPausedMs(timer, now),
-    questionActiveMs: ledger.questions[session.current_question_id] ?? 0,
-    scopeActiveMs: ledger.scopes[session.current_scope_id] ?? 0,
-    taskActiveMs: task ? ledger.tasks[task.task_id] ?? 0 : 0,
-    taskRemainingMs: taskTiming?.remaining_ms ?? (listenRepeat
-      ? Math.max(0, listenRepeat.remaining_ms - liveDelta)
-      : task?.remaining_ms === null || task?.remaining_ms === undefined
-        ? null
-        : Math.max(0, task.remaining_ms - liveDelta))
-  };
+function calculateLiveTimingState(session: PracticeSession, timer: RuntimeTimer, now: number): Pick<AppState, 'activeMs' | 'pausedMs' | 'questionActiveMs' | 'scopeActiveMs'> {
+  const ledger = deriveTimingLedger(session, { activityId: timer.currentActivityId, deltaMs: previewActivityDelta(timer, now) });
+  return { activeMs: ledger.sessionActiveMs, pausedMs: currentPausedMs(timer, now), questionActiveMs: ledger.questions[session.current_question_id] ?? 0, scopeActiveMs: ledger.scopes[session.current_scope_id] ?? 0 };
 }
 
-function timingStateFromSettledSession(
-  session: PracticeSession,
-  pausedMs: number
-): Pick<AppState, 'activeMs' | 'pausedMs' | 'questionActiveMs' | 'scopeActiveMs' | 'taskActiveMs' | 'taskRemainingMs'> {
+function timingStateFromSettledSession(session: PracticeSession, pausedMs: number): Pick<AppState, 'activeMs' | 'pausedMs' | 'questionActiveMs' | 'scopeActiveMs'> {
   const ledger = deriveTimingLedger(session);
-  const task = getCurrentTask(session);
-  const listenRepeat = task?.task_id.startsWith('SR') ? getListenRepeatGroupTiming(session) : undefined;
-  return {
-    activeMs: ledger.sessionActiveMs,
-    pausedMs,
-    questionActiveMs: ledger.questions[session.current_question_id] ?? 0,
-    scopeActiveMs: ledger.scopes[session.current_scope_id] ?? 0,
-    taskActiveMs: task ? ledger.tasks[task.task_id] ?? 0 : 0,
-    taskRemainingMs: listenRepeat?.remaining_ms ?? task?.remaining_ms ?? null
-  };
+  return { activeMs: ledger.sessionActiveMs, pausedMs, questionActiveMs: ledger.questions[session.current_question_id] ?? 0, scopeActiveMs: ledger.scopes[session.current_scope_id] ?? 0 };
 }
 
 function setNavigationResult(
@@ -1984,49 +1312,8 @@ function setNavigationResult(
   });
 }
 
-function applyActivityStartPolicy(timer: RuntimeTimer, session: PracticeSession, now: number): RuntimeTimer {
-  const task = getCurrentTask(session);
-  if (session.current_section_id !== 'Speaking') {
-    const writingFrozen = task?.section_id === 'Writing' && session.mode === 'exam_simulation' &&
-      (task.is_overtime || task.remaining_ms === 0);
-    return {
-      ...timer,
-      currentActivityStartedAtMonotonic: !writingFrozen && timer.pausedAtMonotonic === null ? now : null
-    };
-  }
-  const interviewExpired = task?.task_id.startsWith('SI') && task.remaining_ms === 0;
-  const shouldRun = !interviewExpired && (task?.status === 'ACTIVE' || task?.status === 'OVERTIME');
-  return { ...timer, currentActivityStartedAtMonotonic: shouldRun && timer.pausedAtMonotonic === null ? now : null };
-}
-
-function mutateWritingSession(
-  get: () => AppState,
-  set: (partial: Partial<AppState>) => void,
-  transform: (session: PracticeSession) => PracticeSession,
-  eventType: string
-): boolean {
-  const state = get();
-  if (isInteractionFrozen(state) || state.sessionNotice || !state.session || !state.timer) return false;
-  const now = nowMonotonic();
-  const settled = settleCurrentActivity(state, now);
-  const transformed = transform(settled.session);
-  if (transformed === settled.session) {
-    set({
-      session: settled.session,
-      timer: settled.timer,
-      ...calculateLiveTimingState(settled.session, settled.timer, now)
-    });
-    return false;
-  }
-  const updated = applyDerivedTiming(transformed);
-  set({ session: updated, timer: settled.timer, ...calculateLiveTimingState(updated, settled.timer, now) });
-  const task = getCurrentTask(updated);
-  recordEvent(eventType, {
-    task_id: task?.task_id,
-    modification_count: task?.modification_count ?? 0
-  });
-  scheduleAnswerAutosave();
-  return true;
+function applyActivityStartPolicy(timer: RuntimeTimer, _session: PracticeSession, now: number): RuntimeTimer {
+  return { ...timer, currentActivityStartedAtMonotonic: timer.pausedAtMonotonic === null ? now : null };
 }
 
 function mutateDynamicLongTextState(
@@ -2082,18 +1369,6 @@ function mutateDynamicLongTextState(
   return true;
 }
 
-function recordPendingTaskOvertimeEvent(): void {
-  const state = useAppStore.getState();
-  const task = state.session ? getCurrentTask(state.session) : undefined;
-  if (!state.session || !task?.is_overtime || task.overtime_event_recorded) return;
-  useAppStore.setState({ session: markTaskOvertimeEventRecorded(state.session, task.task_id) });
-  recordEvent('task_overtime', {
-    task_id: task.task_id,
-    active_time_ms: task.active_time_ms,
-    timer_limit_ms: task.timer_limit_ms
-  });
-}
-
 function recordPendingDynamicOvertimeEvent(): void {
   const state = useAppStore.getState();
   if (!state.session || !isDynamicSession(state.session) || !state.timer || state.isPaused) return;
@@ -2135,16 +1410,6 @@ function isNavigationLocked(lockedUntil: number): boolean {
   return nowMonotonic() < lockedUntil;
 }
 
-function lockNavigation(set: (partial: Partial<AppState>) => void): void {
-  if (typeof window === 'undefined') return;
-  const lockedUntil = nowMonotonic() + 250;
-  set({ navigationLockedUntil: lockedUntil });
-  window.setTimeout(() => {
-    if (useAppStore.getState().navigationLockedUntil <= lockedUntil) {
-      useAppStore.setState({ navigationLockedUntil: 0 });
-    }
-  }, 260);
-}
 
 function nowMonotonic(): number {
   return typeof performance === 'undefined' ? Date.now() : performance.now();

@@ -10,16 +10,13 @@ export type ShortcutActionId =
   | 'answer_b'
   | 'answer_c'
   | 'answer_d'
-  | 'complete_scope'
-  | 'speaking_start'
-  | 'speaking_complete'
-  | 'speaking_retry';
+  | 'complete_scope';
 
 export interface ShortcutDefinition {
   action_id: ShortcutActionId;
   default_binding: string;
   current_binding: string;
-  scopes: Array<'global' | 'practice' | 'choice' | 'speaking'>;
+  scopes: Array<'global' | 'practice' | 'choice'>;
   description: string;
   enabled: boolean;
   destructive: boolean;
@@ -38,9 +35,6 @@ export const SHORTCUT_REGISTRY: ShortcutDefinition[] = [
   { action_id: 'answer_c', default_binding: 'C', current_binding: 'C', scopes: ['choice'], description: 'Choose C', enabled: true, destructive: false },
   { action_id: 'answer_d', default_binding: 'D', current_binding: 'D', scopes: ['choice'], description: 'Choose D', enabled: true, destructive: false },
   { action_id: 'complete_scope', default_binding: '', current_binding: '', scopes: ['practice'], description: 'Complete current scope', enabled: true, destructive: true },
-  { action_id: 'speaking_start', default_binding: 'Alt+Enter', current_binding: 'Alt+Enter', scopes: ['speaking'], description: 'Start Speaking', enabled: true, destructive: false },
-  { action_id: 'speaking_complete', default_binding: '', current_binding: '', scopes: ['speaking'], description: 'Complete Speaking', enabled: true, destructive: true },
-  { action_id: 'speaking_retry', default_binding: '', current_binding: '', scopes: ['speaking'], description: 'Retry Speaking', enabled: true, destructive: true }
 ];
 
 export interface ShortcutValidationError {
@@ -164,7 +158,6 @@ export function resolveShortcutAction(
   if (action.scopes.includes('global')) return action.action_id;
   if (context.page !== 'practice') return null;
   if (action.scopes.includes('choice') && !['single_choice', 'multiple_choice'].includes(String(context.answer_mode))) return null;
-  if (action.scopes.includes('speaking') && context.answer_mode !== 'speaking_timer') return null;
   return action.action_id;
 }
 

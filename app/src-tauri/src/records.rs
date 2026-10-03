@@ -893,7 +893,7 @@ fn scan_export_directories(
                 }
                 candidate
             } else {
-                legacy_export_summary(kind, &session.path(), &relative)?
+                unindexed_export_summary(kind, &session.path(), &relative)?
             };
             apply_structure_labels(&mut summary);
             summary.directory_size_bytes = directory_size_without_links(&session.path())?;
@@ -956,18 +956,10 @@ fn apply_structure_labels(summary: &mut LocalRecordSummary) {
     else {
         return;
     };
-    if schema <= 5 {
-        summary
-            .structure_mode
-            .get_or_insert_with(|| "legacy_blueprint".to_string());
-        summary
-            .legacy_label
-            .get_or_insert_with(|| "LEGACY V5".to_string());
-    } else if schema == 6 {
-        summary
-            .structure_mode
-            .get_or_insert_with(|| "dynamic_manual".to_string());
+    if schema == 6 && summary.structure_mode.as_deref() == Some("dynamic_manual") {
         summary.legacy_label = None;
+    } else {
+        summary.diagnostic = Some("UNSUPPORTED_SESSION_SCHEMA".to_string());
     }
 }
 
@@ -1080,7 +1072,7 @@ fn existing_recovery_paths(paths: &AppPaths, session_id: &str) -> Result<Vec<Pat
     Ok(files)
 }
 
-fn legacy_export_summary(
+fn unindexed_export_summary(
     kind: LocalRecordType,
     directory: &Path,
     relative_path: &str,
@@ -1136,7 +1128,7 @@ fn legacy_export_summary(
         last_saved_at: None,
         needs_migration: None,
         diagnostic: Some(
-            "Legacy export: lightweight index will be created on the next export.".to_string(),
+            "Unindexed export: lightweight index will be created on the next export.".to_string(),
         ),
         recovery_classification: None,
         recovery_artifact_count: 0,
@@ -1294,23 +1286,16 @@ fn scan_recovery(
             profile_id: Some(profile),
             blueprint_id: None,
             blueprint_version: None,
-            structure_mode: structure_mode.or_else(|| {
-                schema.map(|version| {
-                    if version <= 5 {
-                        "legacy_blueprint".to_string()
-                    } else {
-                        "dynamic_manual".to_string()
-                    }
-                })
-            }),
+            structure_mode: structure_mode.clone(),
             section_item_counts,
-            legacy_label: schema
-                .filter(|version| *version <= 5)
-                .map(|_| "LEGACY V5".to_string()),
+            legacy_label: None,
             selected_sections,
             active_time_ms: active,
             pause_time_ms: pause,
-            completion_status: if valid == 0 {
+            completion_status: if valid == 0
+                || schema != Some(6)
+                || structure_mode.as_deref() != Some("dynamic_manual")
+            {
                 "CORRUPT"
             } else if completed.is_some() {
                 "COMPLETED"
@@ -1335,11 +1320,13 @@ fn scan_recovery(
                 .ok()
                 .and_then(|metadata| metadata.modified().ok())
                 .map(system_time_string),
-            needs_migration: schema.map(|version| version < 5),
+            needs_migration: None,
             diagnostic: if recovery_classification == STALE_TERMINAL_RECOVERY {
                 Some("已存在完成且导出的正式记录，此恢复快照属于终态残留".to_string())
             } else if valid == 0 {
                 Some("SQLite snapshot JSON is damaged.".to_string())
+            } else if schema != Some(6) || structure_mode.as_deref() != Some("dynamic_manual") {
+                Some("UNSUPPORTED_SESSION_SCHEMA".to_string())
             } else if !file_exists {
                 Some("SQLite snapshot exists but recovery file is missing.".to_string())
             } else {
@@ -2223,84 +2210,6 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore = "run only through npm run verify:r0072.1-lifecycle with a marker-bound disposable APP_ROOT"]
-    fn r0072_1_generated_lifecycle_acceptance() {
-        let root = PathBuf::from(
-            std::env::var_os("R00721_VERIFY_ROOT").expect("R00721_VERIFY_ROOT is required"),
-        );
-        assert!(root.join(".r0072-1-disposable-root").is_file());
-        let paths = current_app_paths();
-        assert_eq!(paths.app_root, root.join("app"));
-        assert_eq!(paths.source_root, root.join("source"));
-        ensure_data_dirs_for_paths(&paths).expect("generated data roots");
-        init_database_for_paths(&paths).expect("generated database");
-        let session_id = "r0072-1-generated-lifecycle";
-
-        insert_recovery_fixture(&paths, session_id);
-        assert!(scan_records_at(&paths)
-            .expect("generated save-close scan")
-            .iter()
-            .any(|record| {
-                record.session_id == session_id
-                    && record.record_type == LocalRecordType::Recovery
-                    && record.recovery_classification.as_deref() == Some(LIVE_RECOVERY)
-            }));
-        complete_recovery_fixture(&paths, session_id);
-        let relative = publish_toefl_fixture(&paths, session_id, "COMPLETED");
-        cleanup_terminal_recovery_for_paths(&paths, session_id, &relative, None)
-            .expect("generated terminal cleanup");
-        assert_eq!(
-            scan_records_at(&paths)
-                .expect("generated exported scan")
-                .iter()
-                .filter(|record| record.session_id == session_id)
-                .count(),
-            1
-        );
-
-        let first_trash = move_one_to_trash(&paths, &toefl_reference(&relative, session_id), None)
-            .expect("generated first Trash");
-        let restored = restore_one_from_trash(
-            &paths,
-            &RecordReference {
-                record_id: "TRASH:r0072-1-generated-first".to_string(),
-                record_type: LocalRecordType::Trash,
-                session_id: session_id.to_string(),
-                relative_path: first_trash,
-            },
-        )
-        .expect("generated restore");
-        let second_trash = move_one_to_trash(&paths, &toefl_reference(&restored, session_id), None)
-            .expect("generated second Trash");
-        permanently_delete_one(
-            &paths,
-            &RecordReference {
-                record_id: "TRASH:r0072-1-generated-second".to_string(),
-                record_type: LocalRecordType::Trash,
-                session_id: session_id.to_string(),
-                relative_path: second_trash,
-            },
-        )
-        .expect("generated permanent delete");
-        assert!(!scan_records_at(&paths)
-            .expect("generated final scan")
-            .iter()
-            .any(|record| record.session_id == session_id));
-        assert!(existing_recovery_paths(&paths, session_id)
-            .expect("generated final recovery artifacts")
-            .is_empty());
-        let conn = Connection::open(paths.database_path()).expect("generated final database");
-        let count: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM practice_sessions WHERE session_id = ?1",
-                params![session_id],
-                |row| row.get(0),
-            )
-            .expect("generated final identity count");
-        assert_eq!(count, 0);
-    }
-
-    #[test]
     #[ignore = "run only through npm run verify:r0073-dynamic with a marker-bound disposable APP_ROOT"]
     fn r0073_generated_dynamic_lifecycle_acceptance() {
         let root = PathBuf::from(
@@ -2406,19 +2315,6 @@ mod tests {
             )
             .expect("generated final identity count");
         assert_eq!(count, 0);
-
-        // A separate synthetic v5 Recovery remains readable and explicitly labelled legacy.
-        insert_recovery_fixture(&paths, "r0073-legacy-v5-readable");
-        let legacy = scan_records_at(&paths)
-            .expect("legacy scan")
-            .into_iter()
-            .find(|record| record.session_id == "r0073-legacy-v5-readable")
-            .expect("legacy v5 Recovery");
-        assert_eq!(
-            legacy.schema_version.as_deref(),
-            Some("practice-session-v5")
-        );
-        assert_eq!(legacy.legacy_label.as_deref(), Some("LEGACY V5"));
     }
 
     fn fixture(name: &str) -> (PathBuf, AppPaths) {
@@ -2465,17 +2361,17 @@ mod tests {
             created_at: Some("2026-07-19T09:00:00Z".to_string()),
             mode: Some("practice".to_string()),
             profile_id: Some("standard".to_string()),
-            blueprint_id: Some("toefl-2026".to_string()),
-            blueprint_version: Some("1.1.0".to_string()),
-            structure_mode: Some("legacy_blueprint".to_string()),
+            blueprint_id: None,
+            blueprint_version: None,
+            structure_mode: Some("dynamic_manual".to_string()),
             section_item_counts: HashMap::new(),
-            legacy_label: Some("LEGACY V5".to_string()),
+            legacy_label: None,
             selected_sections: vec!["Reading".to_string()],
             active_time_ms: 1_000,
             pause_time_ms: 200,
             completion_status: completion_status.to_string(),
             export_status: "EXPORTED".to_string(),
-            schema_version: Some("practice-session-v5".to_string()),
+            schema_version: Some("practice-session-v6".to_string()),
             app_version: Some("test".to_string()),
             directory_size_bytes: 0,
             relative_path: relative_path.to_string(),
@@ -2518,10 +2414,11 @@ mod tests {
     fn insert_recovery_fixture(paths: &AppPaths, session_id: &str) {
         let snapshot = format!(
             r#"{{
-              "session_schema_version": 5,
+              "session_schema_version": 6,
+              "structure_mode": "dynamic_manual",
               "session_id": "{session_id}",
               "current_section_id": "Reading",
-              "current_scope_id": "READING_MODULE_1",
+              "current_scope_id": "Reading",
               "questions": [{{"section_id": "Reading"}}]
             }}"#
         );
@@ -3079,7 +2976,7 @@ mod tests {
         assert_eq!(trash.mode.as_deref(), Some("practice"));
         assert_eq!(trash.completion_status, "COMPLETED");
         assert_eq!(trash.export_status, "EXPORTED");
-        assert_eq!(trash.schema_version.as_deref(), Some("practice-session-v5"));
+        assert_eq!(trash.schema_version.as_deref(), Some("practice-session-v6"));
         assert_eq!(trash.app_version.as_deref(), Some("test"));
         cleanup_fixture(root);
     }
@@ -3768,10 +3665,11 @@ mod tests {
         .expect("typing body");
 
         let snapshot = r#"{
-          "session_schema_version": 5,
+          "session_schema_version": 6,
+              "structure_mode": "dynamic_manual",
           "current_section_id": "Writing",
-          "current_scope_id": "WRITING_EMAIL",
-          "current_task_id": "WRITING_EMAIL",
+          "current_scope_id": "Writing",
+          "current_task_id": null,
           "questions": [{"section_id": "Writing"}]
         }"#;
         let conn = Connection::open(paths.database_path()).expect("database");

@@ -2,11 +2,11 @@
 
 ## Purpose and architecture
 
-TOEFL Answer Collection is a local-first TOEFL answer recorder and typing app with a React/TypeScript frontend in `app/src`, a Tauri/Rust backend in `app/src-tauri`, and tests beside source or in `app/scripts`. Real training content stays outside the repository. New sessions use dynamic schema v6; older readers and exporters remain compatibility code. Historical development ancestry stays in a private repository; public releases use reviewed clean snapshots.
+TOEFL Answer Collection is a local-first TOEFL answer recorder and typing app with a React/TypeScript frontend in `app/src`, a Tauri/Rust backend in `app/src-tauri`, and tests beside source or in `app/scripts`. Real training content stays outside the repository. New sessions use dynamic schema v6; official v1.0.0 v6 records retain compatibility. Historical development ancestry stays in a private repository; public releases use reviewed clean snapshots.
 
 ## Version, rounds and branches
 
-`VERSION` is the display version (`1.0.0`); npm/Cargo/Tauri use the same SemVer. Change these together only by deliberate product version decision. `R00X`, `R00X.M`, and `R00X.M.N` identify work scope, not releases. Name branches like `r008-1-recovery-integrity` and keep each within its round.
+`VERSION` is the display version (`1.0.1`); npm/Cargo/Tauri use the same SemVer. Change these together only by deliberate product version decision. `R00X`, `R00X.M`, and `R00X.M.N` identify work scope, not releases. Name branches like `r008-1-recovery-integrity` and keep each within its round.
 
 ## Git permissions and protected areas
 
@@ -16,7 +16,7 @@ Without specific user authorization, do not modify, move or delete `Demand/`, `C
 
 ## Compatibility and data safety
 
-Preserve schema v2–v5 readers, legacy Speaking, Listening 35+12 and 32+15, old Blueprints and Recovery. Do not delete them because new sessions do not use them. Keep schema v6 stable unless a task expressly requires migration. Use synthetic fixtures; never copy real TOEFL text, media or personal answers into tests, samples, logs or a public handoff. Do not automatically migrate real records.
+Current runtime supports only schema v6 dynamic_manual Reading, Listening, and Writing. R009 explicitly removed pre-v6 readers, Speaking, and Blueprint/task/module runtime. Preserve official v1.0.0 v6 records, optional safe source_relative_path metadata, v6 Recovery, and unchanged SQLite tables. Keep schema v6 stable unless a task expressly requires migration. Use synthetic fixtures; never copy real TOEFL text, media or personal answers into tests, samples, logs or a public handoff. Do not automatically migrate real records.
 
 ## Verification
 

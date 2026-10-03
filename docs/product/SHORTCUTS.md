@@ -1,12 +1,9 @@
 # Shortcuts
 
-The app uses a central Shortcut Registry, dispatched through one `window keydown` listener into existing Store/engine actions. Defaults include F8, Alt+Left/Right, Alt+S/U, A–D, and Alt+Enter. Destructive submit actions have no default binding.
+One central registry/window listener dispatches guarded actions to the dynamic Store. Defaults include F8 pause/resume, Alt+Left/Right navigation, Alt+S/U status marks, A-D choices, and Alt+Enter section completion. Destructive submit actions have no default binding.
 
-Settings support key capture, clearing, restoring defaults, conflict/reserved-key validation, and local persistence. The obsolete `open_review` action without independent value was removed. Loading old settings projects only current Registry actions, discarding that old key while retaining valid bindings such as F1; the old key does not reappear after saving.
+Settings show friendly names, bindings, conflict/reserved-key validation, key capture, clearing, restoring defaults, and practical help. Internal IDs/scope lists/debug metadata are hidden. Saved settings retain valid current bindings and ignore obsolete keys, including removed Speaking actions.
 
-- The answer card is not a separate Review mode. It remains visible with question-number navigation, Question status, a yellow current-question border, and `aria-current`.
-- `toggle_pause` shares its action ID and user binding between TOEFL and Typing. It is the sole exception to text-input business-shortcut blocking: an active or paused Typing textarea can receive it.
-- Writing's Ctrl+Z, Ctrl+Y, and Ctrl+Shift+Z belong to local editor history, not the business Shortcut Registry. Email/Discussion route existing Store history; Build a Sentence uses local history isolated by Question ID.
-- Business shortcuts do not take over Ctrl+A/C/X/V, native Typing history, Chinese IME composition, or Clipboard behavior.
-- Textarea/input/contenteditable, modal, close hold, paused, Speaking pending, AltGraph, and repeat states each have guards. Only successfully handled Writing history actions call `preventDefault()`.
-- Shortcuts are app-local by default. Any future Tauri global shortcut must be disableable. Avoid Windows input-method/language-switch combinations.
+The answer card has per-item navigation/state labels and `aria-current`. Pause/resume is shared with Typing and is the exception to ordinary text-input shortcut blocking. Short/long Writing editors have per-item Ctrl+Z/Ctrl+Y/Ctrl+Shift+Z history. Business shortcuts preserve native clipboard commands and IME composition.
+
+Text inputs/contenteditable, dialogs, batch creation, close hold, pause, AltGraph, and repeated events have guards. Only successfully handled editor history prevents native events. Shortcuts are app-local; no system-wide capture is installed.

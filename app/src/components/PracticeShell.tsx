@@ -8,7 +8,6 @@ import { useAppStore } from '../store/appStore';
 import { formatDuration } from '../lib/timer';
 import { summarizeSession } from '../lib/sessionExport';
 import { deriveTimingLedger } from '../lib/timeLedger';
-import { getCurrentTask, isLongWritingTask, taskStatusLabel } from '../lib/taskRuntime';
 import { isDynamicSession } from '../lib/dynamicSession';
 import { DynamicItemDialog } from './DynamicItemDialog';
 
@@ -20,15 +19,14 @@ export function PracticeShell() {
 
   if (!session) return null;
   if (session.view === 'SESSION_SUMMARY') return <SessionSummary />;
-  const longWritingTask = isLongWritingTask(getCurrentTask(session));
   const dynamicEmptySection = isDynamicSession(session) && !session.current_question_id;
 
   return (
     <section className="practice-layout">
       <TopBar />
-      <div className={longWritingTask ? 'practice-main task-only' : 'practice-main'}>
+      <div className="practice-main">
         {dynamicEmptySection ? <DynamicEmptySection /> : <AnswerPanel />}
-        {longWritingTask || dynamicEmptySection ? null : <ReviewPanel />}
+        {dynamicEmptySection ? null : <ReviewPanel />}
       </div>
       <BottomBar />
       <DynamicItemDialog />
@@ -54,7 +52,6 @@ function DynamicEmptySection() {
   if (!section) return null;
   return (
     <section className="card dynamic-empty-section">
-      <p className="eyebrow">Dynamic Manual Recorder</p>
       <h2>{t(`section.${section.section_id.toLowerCase()}`)}</h2>
       <p>{t('practice.emptySection')}</p>
       <button className="primary" onClick={openCreator}>{t('bottomBar.addItem', { ordinal: section.next_item_ordinal })}</button>
@@ -66,16 +63,12 @@ function SessionNoticeDialog() {
   const { t } = useTranslation();
   const notice = useAppStore((state) => state.sessionNotice);
   const goToFirstUnencountered = useAppStore((state) => state.goToFirstUnencountered);
-  const finalizeCurrentScope = useAppStore((state) => state.finalizeCurrentScope);
   const exportSession = useAppStore((state) => state.exportSession);
   const retryTerminalRecoveryCleanup = useAppStore((state) => state.retryTerminalRecoveryCleanup);
-  const goToFirstSpeakingRetry = useAppStore((state) => state.goToFirstSpeakingRetry);
-  const confirmFinalizeWithSpeakingRetries = useAppStore((state) => state.confirmFinalizeWithSpeakingRetries);
   const finishDynamicCurrentSection = useAppStore((state) => state.finishDynamicCurrentSection);
   const dismiss = useAppStore((state) => state.dismissSessionNotice);
   if (!notice) return null;
   const shownIds = notice.questionIds?.slice(0, 12) ?? [];
-  const shownTaskIds = notice.taskIds?.slice(0, 12) ?? [];
   const remaining = Math.max(0, (notice.questionIds?.length ?? 0) - shownIds.length);
 
   return (
@@ -88,9 +81,7 @@ function SessionNoticeDialog() {
       >
         <h2>{notice.kind === 'error'
           ? t('practice.operationIncomplete')
-          : notice.retryAction === 'CONFIRM_SPEAKING_RETRIES'
-            ? t('practice.speakingNeedsRetry')
-            : t('practice.checkScope')}</h2>
+          : t('practice.checkScope')}</h2>
         <p>{notice.messageKey ? t(notice.messageKey, notice.messageValues) : notice.message}</p>
         {shownIds.length > 0 ? (
           <div className="unencountered-list" aria-label={t('practice.unvisitedItems')}>
@@ -98,36 +89,23 @@ function SessionNoticeDialog() {
             {remaining > 0 ? <span>{t('practice.moreItems', { count: remaining })}</span> : null}
           </div>
         ) : null}
-        {shownTaskIds.length > 0 ? (
-          <div className="unencountered-list" aria-label={t('practice.retryItems')}>
-            {shownTaskIds.map((taskId) => <span key={taskId}>{taskId}</span>)}
-          </div>
-        ) : null}
+
         <div className="dialog-actions">
           {shownIds.length > 0 ? (
             <button className="primary" onClick={goToFirstUnencountered}>{t('practice.goFirstUnvisited')}</button>
           ) : null}
-          {notice.retryAction === 'FINALIZE_SCOPE' ? (
-            <button className="primary" onClick={() => void finalizeCurrentScope()}>{t('practice.retryFinishScope')}</button>
-          ) : null}
+
           {notice.retryAction === 'EXPORT_SESSION' ? (
             <button className="primary" onClick={() => void exportSession()}>{t('practice.retryExport')}</button>
           ) : null}
           {notice.retryAction === 'CLEANUP_TERMINAL_RECOVERY' ? (
             <button className="primary" onClick={() => void retryTerminalRecoveryCleanup()}>{t('practice.retryRecoveryCleanup')}</button>
           ) : null}
-          {notice.retryAction === 'CONFIRM_SPEAKING_RETRIES' ? (
-            <>
-              <button className="primary" onClick={goToFirstSpeakingRetry}>{t('practice.goFirstRetry')}</button>
-              <button onClick={() => void confirmFinalizeWithSpeakingRetries()}>{t('practice.finishAnyway')}</button>
-            </>
-          ) : null}
+
           {notice.retryAction === 'CONFIRM_DYNAMIC_SECTION' ? (
             <button className="primary" onClick={() => void finishDynamicCurrentSection(true)}>{t('practice.confirmFinishSection')}</button>
           ) : null}
-          {notice.retryAction !== 'CONFIRM_SPEAKING_RETRIES' ? (
-            <button onClick={dismiss}>{t('practice.cancelClose')}</button>
-          ) : null}
+          <button onClick={dismiss}>{t('practice.cancelClose')}</button>
         </div>
       </section>
     </div>
@@ -148,9 +126,7 @@ function SessionSummary() {
   const metrics = summarizeSession(session);
   const timing = deriveTimingLedger(session);
   const dynamic = isDynamicSession(session);
-  const sections = dynamic
-    ? session.dynamic_sections.map((section) => section.section_id)
-    : Array.from(new Set(session.modules.map((scope) => scope.section)));
+  const sections = session.dynamic_sections?.map((section) => section.section_id) ?? [];
   const dynamicTypeCounts = dynamic
     ? Array.from(session.questions.reduce((counts, item) => {
         const key = `${item.renderer} / ${item.type_config ? getItemTypeDisplayLabel(item.type_config, i18n.language) : item.type_label}`;
@@ -205,35 +181,13 @@ function SessionSummary() {
             ))}
           </ul>
         </>
-      ) : (
-        <ul className="scope-summary-list">
-          {session.modules.map((scope) => (
-            <li key={scope.id}>
-              <span>{scope.label}</span>
-              <span>{t(scope.status === 'FINALIZED' ? 'status.completed' : 'status.incomplete')} · {formatDuration(scope.activeTimeMs)}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {!dynamic && session.tasks.length > 0 ? (
-        <>
-          <h3>Task Runtime</h3>
-          <ul className="scope-summary-list task-summary-list">
-            {session.tasks.map((task) => (
-              <li key={task.task_id}>
-                <span>{task.task_id} · {task.task_type}</span>
-                <span>{taskStatusLabel(task)} · {formatDuration(task.active_time_ms)}</span>
-              </li>
-            ))}
-          </ul>
-        </>
       ) : null}
       {timing.unattributedActiveMs > 0 ? (
         <p className="danger-text">{t('summary.unattributedTime', { time: formatDuration(timing.unattributedActiveMs) })}</p>
       ) : null}
       <div className={`export-result ${exportStatus}`} aria-live="polite">
         {exportStatus === 'exporting' ? <p>{t('summary.exporting')}</p> : null}
-        {exportStatus === 'exported' ? <p className="success-text">{t('summary.exportSuccess', { path: exportDirectory })}</p> : null}
+        {exportStatus === 'exported' ? <p className="success-text">{t('summary.exportSuccess')}</p> : null}
         {exportStatus === 'error' ? <p className="danger-text">{t('summary.exportFailed', { detail: exportError })}</p> : null}
       </div>
       <div className="summary-actions">

@@ -33,7 +33,6 @@ export function ShortcutSettings() {
     <section className="card settings-section">
       <div className="section-title">
         <div>
-          <p className="eyebrow">Central Shortcut Registry</p>
           <h2>{t('shortcut.title')}</h2>
         </div>
         <button onClick={() => { setDraft(defaultShortcutBindings()); setStatus({ key: 'shortcut.defaultsRestored' }); }}>
@@ -48,8 +47,6 @@ export function ShortcutSettings() {
             <label key={definition.action_id} className="shortcut-row">
               <span>
                 <strong>{t(`shortcut.action.${definition.action_id}`)}</strong>
-                <small>{definition.action_id}{definition.destructive ? t('shortcut.destructive') : ''}</small>
-                <small>{t('shortcut.scopes', { scopes: definition.scopes.join(' / ') })}</small>
               </span>
               <input
                 aria-label={t('shortcut.binding', { action: t(`shortcut.action.${definition.action_id}`) })}

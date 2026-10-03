@@ -77,10 +77,10 @@ jobs:
           if ((Get-Item -LiteralPath $exe).VersionInfo.ProductName -ne 'TOEFL Answer Collection') {
             throw 'Unexpected Windows product metadata'
           }
-          if ((Get-Item -LiteralPath $exe).VersionInfo.ProductVersion -ne '1.0.0') {
+          if ((Get-Item -LiteralPath $exe).VersionInfo.ProductVersion -ne '1.0.1') {
             throw 'Unexpected Windows product version'
           }
-          if ($packages[0].Name -ne 'TOEFL Answer Collection_1.0.0_x64-setup.exe') {
+          if ($packages[0].Name -ne 'TOEFL Answer Collection_1.0.1_x64-setup.exe') {
             throw 'Unexpected NSIS package version or architecture'
           }
           Add-Type -AssemblyName System.Drawing

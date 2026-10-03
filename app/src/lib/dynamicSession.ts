@@ -28,7 +28,6 @@ export const DYNAMIC_SECTION_ORDER: DynamicSectionName[] = ['Reading', 'Listenin
 export type DynamicPracticeSession = PracticeSession & {
   session_schema_version: 6;
   structure_mode: 'dynamic_manual';
-  source_relative_path: string;
   selected_sections: DynamicSectionName[];
   dynamic_sections: DynamicSectionRuntime[];
   item_type_registry: DynamicItemTypeConfig[];
@@ -43,20 +42,17 @@ export function createDynamicSession(input: {
   session_id: string;
   package_id: string;
   source_relative_path?: string;
-  /** Compatibility input for synthetic/older callers; never persisted as source_path in v6. */
-  source_path?: string;
   mode: PracticeMode;
   selected_sections: readonly (DynamicSectionName | string)[];
   created_at?: string;
 }): DynamicPracticeSession {
   const requested = new Set(input.selected_sections);
-  if (requested.has('Speaking')) throw new Error('Speaking is not available for schema v6 Sessions.');
   const selectedSections = DYNAMIC_SECTION_ORDER.filter((section) => requested.has(section));
   if (selectedSections.length === 0) throw new Error('Select at least one dynamic Section.');
   if (requested.size !== selectedSections.length) throw new Error('schema v6 only accepts Reading, Listening, and Writing.');
   const createdAt = input.created_at ?? new Date().toISOString();
-  const sourceRelativePath = input.source_relative_path ?? input.source_path;
-  if (!isSafeRelativePackagePath(sourceRelativePath)) {
+  const sourceRelativePath = input.source_relative_path;
+  if (sourceRelativePath !== undefined && !isSafeRelativePackagePath(sourceRelativePath)) {
     throw new Error('schema v6 requires a relative package source path.');
   }
   const firstSection = selectedSections[0];
@@ -76,7 +72,7 @@ export function createDynamicSession(input: {
     structure_mode: DYNAMIC_STRUCTURE_MODE,
     session_id: input.session_id,
     package_id: input.package_id,
-    source_relative_path: sourceRelativePath,
+    ...(sourceRelativePath === undefined ? {} : { source_relative_path: sourceRelativePath }),
     mode: input.mode,
     timing_profile_id: 'dynamic-manual',
     timing_profile_version: '1.0.0',
@@ -286,15 +282,16 @@ export function validateDynamicSession(session: DynamicPracticeSession): Dynamic
   const errors: string[] = [];
   if (!isDynamicSession(session)) errors.push('Session must be schema v6 dynamic_manual.');
   if (
-    !isSafeRelativePackagePath(session.source_relative_path) ||
+    (session.source_relative_path !== undefined && !isSafeRelativePackagePath(session.source_relative_path)) ||
     session.source_path !== undefined
   ) {
-    errors.push('Dynamic Sessions require source_relative_path and cannot contain legacy source_path.');
+    errors.push('Dynamic Sessions may contain only safe legacy source_relative_path metadata, never source_path.');
   }
+  const raw = session as unknown as Record<string, unknown>;
   if (
-    session.blueprint_id !== undefined ||
-    session.blueprint_version !== undefined ||
-    session.blueprint_override_package_id !== undefined
+    raw.blueprint_id !== undefined ||
+    raw.blueprint_version !== undefined ||
+    raw.blueprint_override_package_id !== undefined
   ) {
     errors.push('Dynamic Sessions cannot contain Blueprint identity.');
   }
@@ -316,7 +313,7 @@ export function validateDynamicSession(session: DynamicPracticeSession): Dynamic
   }
   const sectionIds = session.dynamic_sections.map((section) => section.section_id);
   if (new Set(sectionIds).size !== sectionIds.length) errors.push('Dynamic Section identities must be unique.');
-  if (sectionIds.some((section) => !DYNAMIC_SECTION_ORDER.includes(section))) errors.push('Speaking is not valid in schema v6.');
+  if (sectionIds.some((section) => !DYNAMIC_SECTION_ORDER.includes(section))) errors.push('Only Reading, Listening, and Writing are supported.');
   if (sectionIds.join('\u0000') !== session.selected_sections.join('\u0000')) {
     errors.push('Dynamic Sections must exactly match selected Sections in canonical order.');
   }

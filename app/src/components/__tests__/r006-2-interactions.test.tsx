@@ -1,14 +1,12 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { PackageSummary } from '../../types';
 import type { LocalRecordSummary } from '../../lib/recordManager';
 import { defaultShortcutBindings } from '../../lib/shortcutRegistry';
 import { getAppSetting, listLocalRecords, saveAppSetting } from '../../lib/storage';
-import { enterTask } from '../../lib/taskRuntime';
 import { useAppStore } from '../../store/appStore';
-import { startLegacySessionForTest } from '../../test/legacySession';
-import { AnswerPanel } from '../AnswerPanel';
+import { createDynamicItem, createDynamicSession } from '../../lib/dynamicSession';
+import { getItemTypePreset } from '../../lib/itemTypeRegistry';
 import { GlobalShortcutController } from '../GlobalShortcutController';
 import { ReviewPanel } from '../ReviewPanel';
 import { RecordManager } from '../RecordManager';
@@ -16,7 +14,6 @@ import { ShortcutSettings } from '../ShortcutSettings';
 import { TypingPractice } from '../TypingPractice';
 
 vi.mock('../../lib/storage', () => ({
-  scanPackages: vi.fn(async () => []),
   appendEvent: vi.fn(async () => undefined),
   saveSessionSnapshot: vi.fn(async () => undefined),
   exportSessionTextAtomic: vi.fn(async () => undefined),
@@ -26,7 +23,6 @@ vi.mock('../../lib/storage', () => ({
   openSessionExportDirectory: vi.fn(async () => undefined),
   openTypingExportDirectory: vi.fn(async () => undefined),
   getAppPaths: vi.fn(async () => ({ typing_records_root: 'E:\\synthetic\\typing_records' })),
-  loadBlueprintOverride: vi.fn(async () => undefined),
   getAppSetting: vi.fn(async () => undefined),
   saveAppSetting: vi.fn(async () => undefined),
   listLocalRecords: vi.fn(async () => []),
@@ -37,7 +33,13 @@ vi.mock('../../lib/storage', () => ({
   exportRecoveryRaw: vi.fn(async () => 'synthetic-export.json')
 }));
 
-const pkg: PackageSummary = { package_id: 'Synthetic.01.A.1', source_path: 'readonly-fixture', modules: [] };
+const pkg = { package_id: 'Synthetic.01.A.1' };
+function startCurrentSessionForTest() {
+ const state=useAppStore.getState();
+ const section=state.selectedSections[0];
+ const session=createDynamicSession({session_id: 'synthetic-interactions', package_id: pkg.package_id, mode: state.mode, selected_sections:[section]});
+ useAppStore.setState({session: createDynamicItem(session,section,getItemTypePreset(section,section==='Writing' ? 'writing_build_sentence' : 'reading_single_choice')).session});
+}
 
 beforeEach(() => {
   localStorage.clear();
@@ -47,10 +49,10 @@ beforeEach(() => {
     value: vi.fn()
   });
   useAppStore.setState({
-    packages: [pkg], selectedPackage: pkg, selectedSections: ['Reading'], mode: 'practice',
+    trainingName: pkg.package_id, selectedSections: ['Reading'], mode: 'practice',
     session: undefined, events: [], eventSeq: 0, timer: undefined, activeMs: 0, pausedMs: 0,
-    questionActiveMs: 0, scopeActiveMs: 0, taskActiveMs: 0, taskRemainingMs: null,
-    speakingTransitionPending: false, isPaused: false, navigationLockedUntil: 0,
+    questionActiveMs: 0, scopeActiveMs: 0,
+    isPaused: false, navigationLockedUntil: 0,
     windowClosePhase: 'IDLE', sessionNotice: undefined, saveStatus: 'idle',
     exportStatus: 'idle', exportError: undefined, exportDirectory: undefined,
     shortcutBindings: defaultShortcutBindings()
@@ -61,7 +63,7 @@ afterEach(cleanup);
 
 describe('R006.2.1 removed Review shortcut', () => {
   it('leaves Alt+R unbound while preserving the visible answer card and Session state', () => {
-    startLegacySessionForTest();
+    startCurrentSessionForTest();
     const before = structuredClone(useAppStore.getState().session);
     render(<><GlobalShortcutController homePage="home" /><ReviewPanel /></>);
     const current = screen.getByRole('button', { current: true });
@@ -107,64 +109,6 @@ describe('R006.2 Typing pause shortcut', () => {
   });
 });
 
-describe('R006.2 Writing input policy UI', () => {
-  it('sanitizes mixed Build a Sentence input and shows a non-blocking notice', () => {
-    useAppStore.setState({ selectedSections: ['Writing'] });
-    startLegacySessionForTest();
-    render(<AnswerPanel />);
-    const editor = screen.getByRole('textbox');
-    fireEvent.change(editor, { target: { value: 'Build 中文🙂 sentence.' } });
-    expect(editor).toHaveValue('Build  sentence.');
-    expect(screen.getByText('Writing 仅保留英文与常用英文标点。')).toBeVisible();
-  });
-
-  it('does not commit IME text until composition ends, then removes the illegal commit', () => {
-    useAppStore.setState({ selectedSections: ['Writing'] });
-    startLegacySessionForTest();
-    const session = useAppStore.getState().session;
-    if (!session) throw new Error('missing session');
-    useAppStore.setState({ session: enterTask(session, 'WRITING_EMAIL') });
-    render(<AnswerPanel />);
-    const editor = screen.getByRole('textbox', { name: /Email 写作输入区/ });
-    fireEvent.compositionStart(editor);
-    fireEvent.change(editor, { target: { value: '中文' } });
-    expect(useAppStore.getState().session?.tasks.find((task) => task.task_id === 'WRITING_EMAIL')?.text).toBe('');
-    fireEvent.compositionEnd(editor, { data: '中文' });
-    expect(editor).toHaveValue('');
-    expect(screen.getByText('Writing 仅保留英文与常用英文标点。')).toBeVisible();
-  });
-
-  it('keeps allowed paste text, removes CJK/emoji and preserves a usable caret', () => {
-    useAppStore.setState({ selectedSections: ['Writing'] });
-    startLegacySessionForTest();
-    const session = useAppStore.getState().session;
-    if (!session) throw new Error('missing session');
-    useAppStore.setState({ session: enterTask(session, 'WRITING_ACADEMIC_DISCUSSION') });
-    render(<AnswerPanel />);
-    const editor = screen.getByRole('textbox', { name: /Academic Discussion 写作输入区/ }) as HTMLTextAreaElement;
-    fireEvent.paste(editor, { clipboardData: { getData: () => 'Keep中文🙂 this.' } });
-    expect(editor).toHaveValue('Keep this.');
-    expect(editor.selectionStart).toBe(10);
-  });
-
-  it('sanitizes drop and direct Store mutation paths', () => {
-    useAppStore.setState({ selectedSections: ['Writing'] });
-    startLegacySessionForTest();
-    const session = useAppStore.getState().session;
-    if (!session) throw new Error('missing session');
-    useAppStore.getState().answerCurrent('Direct中文🙂 answer');
-    expect(useAppStore.getState().session?.answers['Writing-1']?.answer_value).toBe('Direct answer');
-    useAppStore.setState({ session: enterTask(useAppStore.getState().session ?? session, 'WRITING_EMAIL') });
-    useAppStore.getState().updateWritingText('Store中文🙂 text', 'insertText');
-    expect(useAppStore.getState().session?.tasks.find((task) => task.task_id === 'WRITING_EMAIL')?.text).toBe('Store text');
-    render(<AnswerPanel />);
-    const editor = screen.getByRole('textbox', { name: /Email 写作输入区/ }) as HTMLTextAreaElement;
-    editor.setSelectionRange(editor.value.length, editor.value.length);
-    fireEvent.drop(editor, { dataTransfer: { getData: () => ' Drop中文🙂.' } });
-    expect(editor).toHaveValue('Store text Drop.');
-  });
-});
-
 function record(index: number): LocalRecordSummary {
   const sessionId = `synthetic-${String(index).padStart(2, '0')}`;
   return {
@@ -180,7 +124,7 @@ function record(index: number): LocalRecordSummary {
     pause_time_ms: 0,
     completion_status: 'COMPLETED',
     export_status: 'EXPORTED',
-    schema_version: 'practice-session-v5',
+    schema_version: 'practice-session-v6',
     app_version: 'R006.2-fixture',
     directory_size_bytes: 128,
     relative_path: `records/Synthetic.R0062/${sessionId}`,

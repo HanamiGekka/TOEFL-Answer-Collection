@@ -89,7 +89,7 @@ async function installSyntheticSession(page: Page): Promise<void> {
     // @ts-expect-error Vite serves this source module only inside the page.
     const { createDynamicSession } = await import('/src/lib/dynamicSession.ts');
     useAppStore.setState({ session: createDynamicSession({
-      session_id: 'e2e-i18n', package_id: 'synthetic', source_relative_path: 'synthetic',
+      session_id: 'e2e-i18n', package_id: 'synthetic',
       mode: 'practice', selected_sections: ['Reading'], created_at: '2026-09-28T00:00:00.000Z'
     }), itemTemplates: { schema_version: 1, templates: [] } });
     useAppStore.getState().openDynamicItemCreator();

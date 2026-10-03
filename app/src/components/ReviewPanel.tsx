@@ -2,7 +2,6 @@ import { useAppStore } from '../store/appStore';
 import { useTranslation } from 'react-i18next';
 import { renderQuestionState } from '../lib/answerState';
 import { getQuestionNavItems } from '../lib/sessionEngine';
-import { getCurrentTask, isLongWritingTask } from '../lib/taskRuntime';
 
 function questionStateClasses(item: ReturnType<typeof getQuestionNavItems>[number]): string {
   return [
@@ -21,7 +20,6 @@ export function ReviewPanel() {
   const goToQuestion = useAppStore((state) => state.goToQuestion);
   const isPaused = useAppStore((state) => state.isPaused);
   if (!session) return null;
-  if (isLongWritingTask(getCurrentTask(session))) return null;
   const items = getQuestionNavItems(session);
 
   return (

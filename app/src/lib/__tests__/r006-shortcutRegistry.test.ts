@@ -109,7 +109,7 @@ describe('R006 central shortcut registry', () => {
   });
 
   it('does not map A on a text answer page', () => {
-    expect(resolveShortcutAction(event('a'), defaultShortcutBindings(), { ...baseContext, answer_mode: 'text' })).toBeNull();
+    expect(resolveShortcutAction(event('a'), defaultShortcutBindings(), { ...baseContext, answer_mode: 'short_text' })).toBeNull();
   });
 
   it('uses Alt+Left and Alt+Right navigation defaults', () => {

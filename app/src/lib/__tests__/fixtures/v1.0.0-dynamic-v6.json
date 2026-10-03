@@ -1,0 +1,353 @@
+{
+  "session_schema_version": 6,
+  "structure_mode": "dynamic_manual",
+  "session_id": "synthetic-v100-v6",
+  "package_id": "Synthetic.01",
+  "source_relative_path": "Synthetic.01",
+  "mode": "practice",
+  "timing_profile_id": "dynamic-manual",
+  "timing_profile_version": "1.0.0",
+  "created_at": "2026-09-29T00:00:00.000Z",
+  "started_at": "2026-09-29T00:00:00.000Z",
+  "completed_sections": [
+    "Reading",
+    "Listening"
+  ],
+  "selected_sections": [
+    "Reading",
+    "Listening",
+    "Writing"
+  ],
+  "active_ms": 2500,
+  "paused_ms": 200,
+  "unattributed_active_time_ms": 0,
+  "current_section_id": "Writing",
+  "current_module_id": "Writing",
+  "current_scope_id": "Writing",
+  "current_question_id": "W1",
+  "current_task_id": null,
+  "active_scope_question_ids": [
+    "W1"
+  ],
+  "active_module_question_ids": [],
+  "active_section_question_ids": [
+    "W1"
+  ],
+  "all_session_question_ids": [
+    "R1",
+    "L1",
+    "W1"
+  ],
+  "current_section": "Writing",
+  "current_question_index": 2,
+  "questions": [
+    {
+      "id": "R1",
+      "section": "Reading",
+      "section_id": "Reading",
+      "module_id": "Reading",
+      "number": 1,
+      "type_label": "Single Choice",
+      "answer_mode": "single_choice",
+      "option_count": 4,
+      "time_limit_ms": null,
+      "remaining_ms": null,
+      "timer_limit_ms": null,
+      "encountered": true,
+      "visit_count": 1,
+      "first_seen_at": "2026-09-29T00:00:00.000Z",
+      "last_entered_at": "2026-09-29T00:00:00.000Z",
+      "item_id": "R1",
+      "ordinal": 1,
+      "type_id": "reading_single_choice",
+      "renderer": "single_choice",
+      "option_labels": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "custom_time_limit_ms": null,
+      "type_config": {
+        "type_id": "reading_single_choice",
+        "type_label": "Single Choice",
+        "renderer": "single_choice",
+        "option_labels": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ],
+        "section_compatibility": [
+          "Reading"
+        ],
+        "custom_time_limit_ms": null,
+        "created_by": "system_preset",
+        "version": "1.0.0"
+      },
+      "created_at": "2026-09-29T00:00:00.000Z",
+      "started_at": "2026-09-29T00:00:00.000Z",
+      "completed_at": null,
+      "pause_time_ms": 0
+    },
+    {
+      "id": "L1",
+      "section": "Listening",
+      "section_id": "Listening",
+      "module_id": "Listening",
+      "number": 1,
+      "type_label": "Multiple Choice",
+      "answer_mode": "multiple_choice",
+      "option_count": 4,
+      "time_limit_ms": null,
+      "remaining_ms": null,
+      "timer_limit_ms": null,
+      "encountered": true,
+      "visit_count": 1,
+      "first_seen_at": "2026-09-29T00:00:00.000Z",
+      "last_entered_at": "2026-09-29T00:00:00.000Z",
+      "item_id": "L1",
+      "ordinal": 1,
+      "type_id": "listening_multiple_choice",
+      "renderer": "multiple_choice",
+      "option_labels": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "custom_time_limit_ms": null,
+      "type_config": {
+        "type_id": "listening_multiple_choice",
+        "type_label": "Multiple Choice",
+        "renderer": "multiple_choice",
+        "option_labels": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ],
+        "section_compatibility": [
+          "Listening"
+        ],
+        "custom_time_limit_ms": null,
+        "created_by": "system_preset",
+        "version": "1.0.0"
+      },
+      "created_at": "2026-09-29T00:00:00.000Z",
+      "started_at": "2026-09-29T00:00:00.000Z",
+      "completed_at": null,
+      "pause_time_ms": 0
+    },
+    {
+      "id": "W1",
+      "section": "Writing",
+      "section_id": "Writing",
+      "module_id": "Writing",
+      "number": 1,
+      "type_label": "Email",
+      "answer_mode": "long_text",
+      "time_limit_ms": null,
+      "remaining_ms": null,
+      "timer_limit_ms": null,
+      "encountered": true,
+      "visit_count": 1,
+      "first_seen_at": "2026-09-29T00:00:00.000Z",
+      "last_entered_at": "2026-09-29T00:00:00.000Z",
+      "item_id": "W1",
+      "ordinal": 1,
+      "type_id": "writing_email",
+      "renderer": "long_text",
+      "option_labels": [],
+      "custom_time_limit_ms": null,
+      "type_config": {
+        "type_id": "writing_email",
+        "type_label": "Email",
+        "renderer": "long_text",
+        "option_labels": [],
+        "section_compatibility": [
+          "Writing"
+        ],
+        "custom_time_limit_ms": null,
+        "created_by": "system_preset",
+        "version": "1.0.0"
+      },
+      "created_at": "2026-09-29T00:00:00.000Z",
+      "started_at": "2026-09-29T00:00:00.000Z",
+      "completed_at": null,
+      "pause_time_ms": 0,
+      "writing_state": {
+        "text": "Synthetic draft.",
+        "word_count": 2,
+        "character_count": 16,
+        "keyboard_cpm": 1920,
+        "keyboard_inserted_characters": 16,
+        "pasted_characters": 0,
+        "deleted_characters": 0,
+        "cut_count": 0,
+        "paste_count": 0,
+        "undo_count": 0,
+        "redo_count": 0,
+        "modification_count": 1,
+        "undo_stack": [
+          ""
+        ],
+        "redo_stack": []
+      }
+    }
+  ],
+  "answers": {
+    "R1": {
+      "question_id": "R1",
+      "answer_value": "B",
+      "progress_status": "ANSWERED",
+      "status": "ANSWERED",
+      "is_overtime": false,
+      "is_skipped": false,
+      "is_uncertain": false,
+      "first_answer_elapsed_ms": 100,
+      "final_answer_elapsed_ms": 1000,
+      "first_answer_at": "2026-09-29T00:00:00.000Z",
+      "active_time_ms": 1000,
+      "total_active_ms": 1000,
+      "modification_count": 0,
+      "revision_count": 0,
+      "marked_review": false,
+      "last_changed_at": "2026-09-29T00:00:00.000Z",
+      "updated_at": "2026-09-29T00:00:00.000Z"
+    },
+    "L1": {
+      "question_id": "L1",
+      "answer_value": [
+        "A",
+        "C"
+      ],
+      "progress_status": "ANSWERED",
+      "status": "ANSWERED",
+      "is_overtime": false,
+      "is_skipped": false,
+      "is_uncertain": false,
+      "first_answer_elapsed_ms": 100,
+      "final_answer_elapsed_ms": 1000,
+      "first_answer_at": "2026-09-29T00:00:00.000Z",
+      "active_time_ms": 1000,
+      "total_active_ms": 1000,
+      "modification_count": 0,
+      "revision_count": 0,
+      "marked_review": false,
+      "last_changed_at": "2026-09-29T00:00:00.000Z",
+      "updated_at": "2026-09-29T00:00:00.000Z"
+    },
+    "W1": {
+      "question_id": "W1",
+      "answer_value": "Synthetic draft.",
+      "progress_status": "ANSWERED",
+      "status": "ANSWERED",
+      "is_overtime": false,
+      "is_skipped": false,
+      "is_uncertain": false,
+      "first_answer_elapsed_ms": 100,
+      "final_answer_elapsed_ms": 500,
+      "first_answer_at": "2026-09-29T00:00:00.000Z",
+      "active_time_ms": 500,
+      "total_active_ms": 500,
+      "modification_count": 0,
+      "revision_count": 0,
+      "marked_review": false,
+      "last_changed_at": "2026-09-29T00:00:00.000Z",
+      "updated_at": "2026-09-29T00:00:00.000Z"
+    }
+  },
+  "modules": [],
+  "tasks": [],
+  "dynamic_sections": [
+    {
+      "section_id": "Reading",
+      "status": "COMPLETED",
+      "created_at": "2026-09-29T00:00:00.000Z",
+      "started_at": "2026-09-29T00:00:00.000Z",
+      "completed_at": "2026-09-29T00:00:00.000Z",
+      "next_item_ordinal": 2,
+      "item_ids": [
+        "R1"
+      ],
+      "active_time_ms": 1000,
+      "pause_time_ms": 0
+    },
+    {
+      "section_id": "Listening",
+      "status": "COMPLETED",
+      "created_at": "2026-09-29T00:00:00.000Z",
+      "started_at": "2026-09-29T00:00:00.000Z",
+      "completed_at": "2026-09-29T00:00:00.000Z",
+      "next_item_ordinal": 2,
+      "item_ids": [
+        "L1"
+      ],
+      "active_time_ms": 1000,
+      "pause_time_ms": 0
+    },
+    {
+      "section_id": "Writing",
+      "status": "IN_PROGRESS",
+      "created_at": "2026-09-29T00:00:00.000Z",
+      "started_at": "2026-09-29T00:00:00.000Z",
+      "completed_at": null,
+      "next_item_ordinal": 2,
+      "item_ids": [
+        "W1"
+      ],
+      "active_time_ms": 500,
+      "pause_time_ms": 0
+    }
+  ],
+  "item_type_registry": [
+    {
+      "type_id": "reading_single_choice",
+      "type_label": "Single Choice",
+      "renderer": "single_choice",
+      "option_labels": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "section_compatibility": [
+        "Reading"
+      ],
+      "custom_time_limit_ms": null,
+      "created_by": "system_preset",
+      "version": "1.0.0"
+    },
+    {
+      "type_id": "listening_multiple_choice",
+      "type_label": "Multiple Choice",
+      "renderer": "multiple_choice",
+      "option_labels": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "section_compatibility": [
+        "Listening"
+      ],
+      "custom_time_limit_ms": null,
+      "created_by": "system_preset",
+      "version": "1.0.0"
+    },
+    {
+      "type_id": "writing_email",
+      "type_label": "Email",
+      "renderer": "long_text",
+      "option_labels": [],
+      "section_compatibility": [
+        "Writing"
+      ],
+      "custom_time_limit_ms": null,
+      "created_by": "system_preset",
+      "version": "1.0.0"
+    }
+  ],
+  "view": "PRACTICE"
+}

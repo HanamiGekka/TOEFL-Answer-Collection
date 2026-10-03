@@ -1,4 +1,3 @@
-use regex::Regex;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -22,25 +21,10 @@ mod records;
 
 use app_paths::{current_app_paths, AppPaths};
 
-#[derive(Debug, Serialize)]
-struct PackageSummary {
-    package_id: String,
-    source_relative_path: String,
-    modules: Vec<PackageModuleSummary>,
-}
-
-#[derive(Debug, Serialize)]
-struct PackageModuleSummary {
-    module_name: String,
-    file_names: Vec<String>,
-}
-
 #[derive(Debug, Deserialize, Serialize)]
 struct PracticeSessionLite {
     session_id: String,
     package_id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    source_path: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     source_relative_path: Option<String>,
     mode: String,
@@ -54,9 +38,9 @@ struct PracticeSessionLite {
     unattributed_active_time_ms: i64,
     questions: Vec<PracticeQuestionTimeLite>,
     answers: HashMap<String, AnswerTimeLite>,
-    modules: Vec<ModuleTimeLite>,
+    modules: Vec<Value>,
     #[serde(default)]
-    tasks: Vec<TaskTimeLite>,
+    tasks: Vec<Value>,
     #[serde(flatten)]
     _extra: Value,
 }
@@ -81,26 +65,6 @@ struct AnswerTimeLite {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct ModuleTimeLite {
-    id: String,
-    #[serde(rename = "activeTimeMs")]
-    active_time_ms: i64,
-    #[serde(flatten)]
-    _extra: Value,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct TaskTimeLite {
-    task_id: String,
-    active_time_ms: i64,
-    pause_time_ms: i64,
-    remaining_ms: Option<i64>,
-    timer_limit_ms: Option<i64>,
-    #[serde(flatten)]
-    _extra: Value,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
 struct EventLogEntry {
     session_id: String,
     seq: i64,
@@ -118,13 +82,7 @@ fn ensure_data_dirs() -> Result<(), String> {
 
 fn ensure_data_dirs_for_paths(paths: &AppPaths) -> Result<(), String> {
     app_paths::validate_controlled_roots(paths)?;
-    for relative in [
-        "data",
-        "data/recovery",
-        "logs",
-        "config",
-        "config/timing-profiles",
-    ] {
+    for relative in ["data", "data/recovery", "logs", "config"] {
         fs::create_dir_all(paths.app_root.join(relative)).map_err(to_string)?;
     }
     fs::create_dir_all(&paths.records_root).map_err(to_string)?;
@@ -275,36 +233,6 @@ fn init_database_for_paths(paths: &AppPaths) -> Result<(), String> {
     Ok(())
 }
 
-#[tauri::command]
-fn scan_packages() -> Result<Vec<PackageSummary>, String> {
-    scan_packages_at(&current_app_paths().source_root)
-}
-
-fn scan_packages_at(root: &Path) -> Result<Vec<PackageSummary>, String> {
-    app_paths::inspect_source_root(root)?;
-    let id_re =
-        Regex::new(r"^(?:\d{2}\.\d{2}\.[A-Z]\.\d+|Mock\.\d{2}\.[A-Z]\.\d+)$").map_err(to_string)?;
-    let mut packages = Vec::new();
-
-    for entry in fs::read_dir(root).map_err(to_string)? {
-        let entry = entry.map_err(to_string)?;
-        if !entry.file_type().map_err(to_string)?.is_dir() {
-            continue;
-        }
-        let package_id = entry.file_name().to_string_lossy().to_string();
-        if !id_re.is_match(&package_id) {
-            continue;
-        }
-        packages.push(PackageSummary {
-            source_relative_path: package_id.clone(),
-            package_id,
-            modules: Vec::new(),
-        });
-    }
-    packages.sort_by(|a, b| a.package_id.cmp(&b.package_id));
-    Ok(packages)
-}
-
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 enum PersistenceReason {
@@ -342,6 +270,17 @@ fn save_session_snapshot_for_paths_with_fault(
     reason: PersistenceReason,
     inject_test_fault: bool,
 ) -> Result<(), String> {
+    if session
+        ._extra
+        .get("session_schema_version")
+        .and_then(Value::as_u64)
+        != Some(6)
+        || session._extra.get("structure_mode").and_then(Value::as_str) != Some("dynamic_manual")
+        || !session.modules.is_empty()
+        || !session.tasks.is_empty()
+    {
+        return Err("UNSUPPORTED_SESSION_SCHEMA".to_string());
+    }
     init_database_for_paths(paths)?;
     if reason == PersistenceReason::WindowClose
         && (inject_test_fault || app_paths::consume_r0063_fault("recovery_window_close"))
@@ -352,11 +291,7 @@ fn save_session_snapshot_for_paths_with_fault(
         );
     }
     let snapshot = serde_json::to_string_pretty(&session).map_err(to_string)?;
-    let metadata_source_path = session
-        .source_relative_path
-        .as_deref()
-        .or(session.source_path.as_deref())
-        .unwrap_or("");
+    let metadata_source_path = session.source_relative_path.as_deref().unwrap_or("");
     let path = paths
         .recovery_root()
         .join(format!("{}.json", safe_file_name(&session.session_id)));
@@ -567,30 +502,6 @@ fn save_app_setting_for_paths(paths: &AppPaths, key: &str, value: &Value) -> Res
 }
 
 #[tauri::command]
-fn load_blueprint_override(package_id: String) -> Result<Option<Value>, String> {
-    let id_re =
-        Regex::new(r"^(?:\d{2}\.\d{2}\.[A-Z]\.\d+|Mock\.\d{2}\.[A-Z]\.\d+)$").map_err(to_string)?;
-    if !id_re.is_match(&package_id) {
-        return Err("invalid package id for blueprint override".to_string());
-    }
-    let paths = current_app_paths();
-    app_paths::validate_controlled_roots(&paths)?;
-    let path = paths
-        .app_root
-        .join("config/package-overrides")
-        .join(format!("{package_id}.json"));
-    if !path.exists() {
-        return Ok(None);
-    }
-    let metadata = fs::symlink_metadata(&path).map_err(to_string)?;
-    if metadata.file_type().is_symlink() || !metadata.is_file() || metadata.len() > 256 * 1024 {
-        return Err("blueprint override is unsafe, not a file, or too large".to_string());
-    }
-    let content = fs::read_to_string(path).map_err(to_string)?;
-    serde_json::from_str(&content).map(Some).map_err(to_string)
-}
-
-#[tauri::command]
 fn export_text_atomic(relative_path: String, content: String) -> Result<(), String> {
     let path = safe_typing_path(&relative_path)?;
     atomic_write(&path, &content)
@@ -621,6 +532,16 @@ impl ExportDirectoryRoot {
 fn open_session_export_directory(relative_path: String) -> Result<(), String> {
     let path = resolve_export_directory(ExportDirectoryRoot::Records, &relative_path)?;
     open_directory_in_explorer(&path)
+}
+
+#[tauri::command]
+fn open_data_folder() -> Result<(), String> {
+    ensure_data_dirs()?;
+    let root = current_app_paths().app_root;
+    if !root.is_dir() {
+        return Err("DATA_FOLDER_UNAVAILABLE".to_string());
+    }
+    open_directory_in_explorer(&root)
 }
 
 #[tauri::command]
@@ -853,12 +774,11 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             ensure_data_dirs,
             init_database,
-            scan_packages,
+            open_data_folder,
             save_session_snapshot,
             append_event,
             get_app_setting,
             save_app_setting,
-            load_blueprint_override,
             export_text_atomic,
             export_session_text_atomic,
             records::export_session_bundle_atomic,
@@ -890,36 +810,6 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn r0073_package_scan_returns_metadata_without_inspecting_package_files() {
-        let nonce = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("clock")
-            .as_nanos();
-        let root = std::env::temp_dir().join(format!("toefl-r0073-package-metadata-{nonce}"));
-        let package = root.join("Mock.01.A.1");
-        fs::create_dir_all(package.join("Reading")).expect("package fixture");
-        fs::write(
-            package.join("Reading").join("must-not-be-listed.txt"),
-            "synthetic",
-        )
-        .expect("synthetic package file");
-
-        let packages = scan_packages_at(&root).expect("scan");
-        assert_eq!(packages.len(), 1);
-        assert_eq!(packages[0].package_id, "Mock.01.A.1");
-        assert_eq!(packages[0].source_relative_path, "Mock.01.A.1");
-        assert!(packages[0].modules.is_empty());
-
-        fs::remove_dir_all(root).expect("fixture cleanup");
-    }
-
-    #[test]
-    fn r0083_unconfigured_source_scan_is_recoverable() {
-        let error = scan_packages_at(Path::new("")).expect_err("no configured SOURCE_ROOT");
-        assert_eq!(error, "SOURCE_ROOT_UNCONFIGURED");
-    }
 
     #[test]
     fn export_text_atomic_rejects_unsafe_paths() {
@@ -1050,24 +940,21 @@ mod tests {
 
     #[test]
     fn complete_integer_frontend_payload_deserializes_but_float_duration_is_rejected() {
-        let fixture = include_str!("../tests/fixtures/r005_2_1_session_payload.json");
+        let fixture = include_str!("../../src/lib/__tests__/fixtures/v1.0.0-dynamic-v6.json");
         let parsed: PracticeSessionLite =
             serde_json::from_str(fixture).expect("integer frontend fixture should deserialize");
-        assert_eq!(parsed.active_ms, 24_203);
-        assert_eq!(parsed.tasks[0].active_time_ms, 412);
+        assert_eq!(parsed.active_ms, 2_500);
+        assert!(parsed.tasks.is_empty());
 
-        let floating = fixture.replacen(
-            "\"active_time_ms\": 22790",
-            "\"active_time_ms\": 22790.29999999702",
-            1,
-        );
+        let floating =
+            fixture.replacen("\"active_time_ms\": 1000", "\"active_time_ms\": 1000.3", 1);
         assert!(serde_json::from_str::<PracticeSessionLite>(&floating).is_err());
     }
 
     #[test]
     fn large_safe_integer_payload_deserializes_and_saves() {
-        let fixture = include_str!("../tests/fixtures/r005_2_1_session_payload.json");
-        let large = fixture.replacen("\"active_ms\": 24203", "\"active_ms\": 9007199254740991", 1);
+        let fixture = include_str!("../../src/lib/__tests__/fixtures/v1.0.0-dynamic-v6.json");
+        let large = fixture.replacen("\"active_ms\": 2500", "\"active_ms\": 9007199254740991", 1);
         let parsed: PracticeSessionLite = serde_json::from_str(&large)
             .expect("large JS-safe i64 milliseconds should deserialize");
         assert_eq!(parsed.active_ms, 9_007_199_254_740_991);
@@ -1079,7 +966,7 @@ mod tests {
         let stored: i64 = conn
             .query_row(
                 "SELECT active_ms FROM practice_sessions WHERE session_id = ?1",
-                ["r005-2-1-rust-fixture"],
+                ["synthetic-v100-v6"],
                 |row| row.get(0),
             )
             .expect("large duration row should exist");
@@ -1089,28 +976,48 @@ mod tests {
     }
 
     #[test]
+    fn unsupported_session_schema_is_rejected_before_creating_storage() {
+        let root =
+            std::env::temp_dir().join(format!("toefl-r009-unsupported-{}", std::process::id()));
+        assert!(!root.exists());
+        for schema in [2, 3, 4, 5] {
+            let mut fixture: Value = serde_json::from_str(include_str!(
+                "../../src/lib/__tests__/fixtures/v1.0.0-dynamic-v6.json"
+            ))
+            .unwrap();
+            fixture["session_schema_version"] = serde_json::json!(schema);
+            let parsed: PracticeSessionLite = serde_json::from_value(fixture).unwrap();
+            assert_eq!(
+                save_session_snapshot_to(&root, parsed).unwrap_err(),
+                "UNSUPPORTED_SESSION_SCHEMA"
+            );
+            assert!(!root.exists());
+        }
+    }
+
+    #[test]
     fn normalized_snapshot_round_trips_through_recovery_and_sqlite() {
         let root = std::env::temp_dir().join(format!("toefl-r00521-save-{}", std::process::id()));
-        let fixture = include_str!("../tests/fixtures/r005_2_1_session_payload.json");
+        let fixture = include_str!("../../src/lib/__tests__/fixtures/v1.0.0-dynamic-v6.json");
         let parsed: PracticeSessionLite = serde_json::from_str(fixture).expect("valid fixture");
 
         save_session_snapshot_to(&root, parsed).expect("snapshot should save");
-        let recovery = fs::read_to_string(root.join("data/recovery/r005-2-1-rust-fixture.json"))
+        let recovery = fs::read_to_string(root.join("data/recovery/synthetic-v100-v6.json"))
             .expect("recovery snapshot should exist");
         let recovered: PracticeSessionLite =
             serde_json::from_str(&recovery).expect("recovery should deserialize again");
-        assert_eq!(recovered.active_ms, 24_203);
+        assert_eq!(recovered.active_ms, 2_500);
 
         let conn = Connection::open(root.join("data/answer_collection.sqlite3"))
             .expect("fixture database should open");
         let stored: (i64, i64, String) = conn
             .query_row(
                 "SELECT active_ms, paused_ms, snapshot_json FROM practice_sessions WHERE session_id = ?1",
-                ["r005-2-1-rust-fixture"],
+                ["synthetic-v100-v6"],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
             .expect("saved row should exist");
-        assert_eq!((stored.0, stored.1), (24_203, 412));
+        assert_eq!((stored.0, stored.1), (2_500, 200));
         serde_json::from_str::<PracticeSessionLite>(&stored.2)
             .expect("SQLite snapshot JSON should deserialize again");
         drop(conn);
@@ -1125,7 +1032,7 @@ mod tests {
           "structure_mode":"dynamic_manual",
           "session_id":"r0073-v6-round-trip",
           "package_id":"Mock.01.A.1",
-          "source_path":"C:\\Synthetic\\LegacySource",
+          "source_relative_path":"Synthetic.01",
           "mode":"practice",
           "timing_profile_id":"dynamic-manual",
           "timing_profile_version":"1.0.0",
@@ -1153,7 +1060,7 @@ mod tests {
         let recovered: Value = serde_json::from_str(&recovery).expect("v6 Recovery JSON");
         assert_eq!(recovered["session_schema_version"], 6);
         assert_eq!(recovered["structure_mode"], "dynamic_manual");
-        assert_eq!(recovered["source_path"], r"C:\Synthetic\LegacySource");
+        assert_eq!(recovered["source_relative_path"], "Synthetic.01");
         assert_eq!(recovered["dynamic_sections"][0]["next_item_ordinal"], 2);
         assert_eq!(recovered["questions"][0]["option_labels"][1], "C");
         assert_eq!(recovered["answers"]["R1"]["answer_value"][0], "C");
@@ -1175,7 +1082,7 @@ mod tests {
     }
 
     #[test]
-    fn r0083_new_v6_persists_only_relative_source_metadata() {
+    fn r009_old_v6_source_metadata_and_new_v6_without_source_round_trip() {
         let root = std::env::temp_dir().join(format!("toefl-r0083-v6-{}", std::process::id()));
         let payload = serde_json::json!({
             "session_schema_version": 6,
@@ -1198,8 +1105,18 @@ mod tests {
             "tasks": [],
             "dynamic_sections": []
         });
-        let parsed: PracticeSessionLite = serde_json::from_value(payload).expect("new v6 fixture");
+        let mut new_payload = payload.clone();
+        new_payload
+            .as_object_mut()
+            .expect("object")
+            .remove("source_relative_path");
+        new_payload["session_id"] = Value::String("r009-no-source".to_string());
+        new_payload["package_id"] = Value::String("第3套练习 Test".to_string());
+        let parsed: PracticeSessionLite = serde_json::from_value(payload).expect("old v6 fixture");
         save_session_snapshot_to(&root, parsed).expect("new v6 snapshot should save");
+        let new_session: PracticeSessionLite =
+            serde_json::from_value(new_payload).expect("new v6 fixture");
+        save_session_snapshot_to(&root, new_session).expect("new v6 snapshot should save");
         let recovery = fs::read_to_string(root.join("data/recovery/r0083-relative-source.json"))
             .expect("new v6 Recovery JSON");
         let conn =
@@ -1218,6 +1135,17 @@ mod tests {
             assert!(value.get("source_path").is_none());
             assert!(!serialized.contains(&root.to_string_lossy().to_string()));
         }
+        let (new_source, new_snapshot): (String, String) = conn
+            .query_row(
+                "SELECT source_path, snapshot_json FROM practice_sessions WHERE session_id = ?1",
+                ["r009-no-source"],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("new v6 row");
+        assert_eq!(new_source, "");
+        let new_snapshot: Value = serde_json::from_str(&new_snapshot).expect("new v6 snapshot");
+        assert_eq!(new_snapshot["package_id"], "第3套练习 Test");
+        assert!(new_snapshot.get("source_relative_path").is_none());
         drop(conn);
         fs::remove_dir_all(root).expect("synthetic fixture cleanup");
     }
@@ -1229,7 +1157,7 @@ mod tests {
         let source = root.join("source");
         fs::create_dir_all(&source).expect("source fixture");
         let paths = AppPaths::for_root(&root.join("app"), &source);
-        let fixture = include_str!("../tests/fixtures/r005_2_1_session_payload.json");
+        let fixture = include_str!("../../src/lib/__tests__/fixtures/v1.0.0-dynamic-v6.json");
         let mut parsed: PracticeSessionLite = serde_json::from_str(fixture).expect("valid fixture");
         parsed.session_id = "r0063-window-close-retry".to_string();
 
@@ -1254,7 +1182,7 @@ mod tests {
         assert_eq!(count, 0);
         drop(conn);
 
-        let retry_fixture = include_str!("../tests/fixtures/r005_2_1_session_payload.json");
+        let retry_fixture = include_str!("../../src/lib/__tests__/fixtures/v1.0.0-dynamic-v6.json");
         let mut retry: PracticeSessionLite =
             serde_json::from_str(retry_fixture).expect("retry fixture");
         retry.session_id = "r0063-window-close-retry".to_string();
@@ -1266,7 +1194,8 @@ mod tests {
         )
         .expect("retry saves recovery");
 
-        let second_retry_fixture = include_str!("../tests/fixtures/r005_2_1_session_payload.json");
+        let second_retry_fixture =
+            include_str!("../../src/lib/__tests__/fixtures/v1.0.0-dynamic-v6.json");
         let mut second_retry: PracticeSessionLite =
             serde_json::from_str(second_retry_fixture).expect("second retry fixture");
         second_retry.session_id = "r0063-window-close-retry".to_string();
@@ -1293,27 +1222,6 @@ mod tests {
             .expect("retry row count");
         assert_eq!(count, 1);
         drop(conn);
-        fs::remove_dir_all(root).expect("fixture cleanup");
-    }
-
-    #[test]
-    fn task_overtime_event_marker_round_trips_as_extra_schema_data() {
-        let root = std::env::temp_dir().join(format!("toefl-r00541-marker-{}", std::process::id()));
-        let fixture = include_str!("../tests/fixtures/r005_2_1_session_payload.json").replacen(
-            "\"is_overtime\": false,",
-            "\"is_overtime\": false, \"overtime_event_recorded\": true,",
-            1,
-        );
-        let parsed: PracticeSessionLite =
-            serde_json::from_str(&fixture).expect("marker fixture should deserialize");
-
-        save_session_snapshot_to(&root, parsed).expect("marker snapshot should save");
-        let recovery = fs::read_to_string(root.join("data/recovery/r005-2-1-rust-fixture.json"))
-            .expect("marker recovery snapshot should exist");
-        let recovered: Value =
-            serde_json::from_str(&recovery).expect("marker recovery should parse");
-        assert_eq!(recovered["tasks"][0]["overtime_event_recorded"], true);
-
         fs::remove_dir_all(root).expect("fixture cleanup");
     }
 

@@ -2,6 +2,7 @@ import type { SectionName } from '../types';
 import { NEW_SESSION_SECTION_ORDER } from '../constants';
 import { useAppStore } from '../store/appStore';
 import { useTranslation } from 'react-i18next';
+import { validateTrainingName } from '../lib/trainingName';
 
 export function PracticeSetup() {
   const { t } = useTranslation();
@@ -10,10 +11,17 @@ export function PracticeSetup() {
   const selectedSections = useAppStore((state) => state.selectedSections);
   const toggleSection = useAppStore((state) => state.toggleSection);
   const startSession = useAppStore((state) => state.startSession);
-  const selectedPackage = useAppStore((state) => state.selectedPackage);
+  const trainingName = useAppStore((state) => state.trainingName);
+  const setTrainingName = useAppStore((state) => state.setTrainingName);
+  const nameError = validateTrainingName(trainingName).error;
 
   return (
     <div className="stack">
+      <label className="label" htmlFor="training-name">{t('setup.trainingName')}</label>
+      <input id="training-name" value={trainingName} placeholder={t('setup.trainingNamePlaceholder')}
+        aria-invalid={Boolean(nameError)} aria-describedby="training-name-error"
+        onChange={(event) => setTrainingName(event.target.value)} />
+      {nameError ? <p id="training-name-error" className="warning-text">{t(`setup.trainingName.${nameError}`)}</p> : null}
       <fieldset>
         <legend>{t('setup.mode')}</legend>
         <label><input type="radio" checked={mode === 'practice'} onChange={() => setMode('practice')} /> {t('setup.practiceMode')}</label>
@@ -33,8 +41,9 @@ export function PracticeSetup() {
           </label>
         ))}
       </fieldset>
+      {selectedSections.length === 0 ? <p className="warning-text">{t('setup.sectionRequired')}</p> : null}
 
-      <button className="primary" disabled={!selectedPackage} onClick={startSession}>
+      <button className="primary" disabled={Boolean(nameError) || selectedSections.length === 0} onClick={startSession}>
         {t('setup.start')}
       </button>
 

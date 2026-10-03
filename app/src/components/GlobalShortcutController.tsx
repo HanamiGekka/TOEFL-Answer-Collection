@@ -4,7 +4,6 @@ import {
   resolveShortcutAction,
   type ShortcutContext
 } from '../lib/shortcutRegistry';
-import { getCurrentTask } from '../lib/taskRuntime';
 import { canToggleTypingPause, toggleTypingPause } from '../lib/typingPause';
 import { useAppStore } from '../store/appStore';
 
@@ -24,7 +23,6 @@ export function GlobalShortcutController({ homePage }: { homePage: ShortcutConte
       const state = useAppStore.getState();
       const session = state.session;
       const question = session ? getCurrentQuestion(session) : undefined;
-      const task = session ? getCurrentTask(session) : undefined;
       const typingActive = !session && canToggleTypingPause();
       const targetKind = describeTarget(event.target);
       const page: ShortcutContext['page'] = session
@@ -37,7 +35,7 @@ export function GlobalShortcutController({ homePage }: { homePage: ShortcutConte
         is_composing: isComposing,
         clipboard_active: clipboardActive,
         modal_open: Boolean(state.sessionNotice) || state.windowClosePhase !== 'IDLE',
-        task_transition_pending: state.speakingTransitionPending,
+        task_transition_pending: state.batchPending,
         paused: Boolean(session && state.isPaused),
         typing_active: typingActive
       });
@@ -45,18 +43,15 @@ export function GlobalShortcutController({ homePage }: { homePage: ShortcutConte
       if (action === 'toggle_pause' && !session && !typingActive) return;
       event.preventDefault();
       switch (action) {
-        case 'toggle_pause': session ? state.togglePause() : toggleTypingPause(); break;
+        case 'toggle_pause':
+          if (session) state.togglePause();
+          else toggleTypingPause();
+          break;
         case 'next_question': state.nextQuestion(); break;
         case 'previous_question': state.previousQuestion(); break;
         case 'skip_question': state.skipCurrent(); break;
         case 'toggle_uncertain': state.toggleReview(); break;
         case 'complete_scope': void state.finalizeCurrentScope(); break;
-        case 'speaking_start': void state.startSpeakingCurrent(); break;
-        case 'speaking_complete': void state.markSpeakingCurrent('COMPLETED'); break;
-        case 'speaking_retry':
-          if (task?.needs_retry) void state.retrySpeakingCurrent();
-          else void state.markSpeakingCurrent('NEEDS_RETRY');
-          break;
         default: answerFromShortcut(action.slice(-1).toUpperCase(), state, question?.answer_mode);
       }
     };

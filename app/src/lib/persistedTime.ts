@@ -1,8 +1,6 @@
 import type {
   AnswerRecord,
   EventLogEntry,
-  ModuleRuntimeState,
-  PersistedTaskRuntime,
   PracticeQuestion,
   PracticeSession,
   TypingMinuteSample,
@@ -56,14 +54,8 @@ export function serializeSessionForPersistence(session: PracticeSession): Practi
   const answers = Object.fromEntries(
     Object.entries(session.answers).map(([questionId, answer]) => [questionId, serializeAnswer(answer, questionId)])
   );
-  const tasks = (session.tasks ?? []).map((task, index) => serializeTask({
-    ...task,
-    active_time_ms: task.question_ids?.reduce(
-      (sum, questionId) => sum + (answers[questionId]?.active_time_ms ?? 0),
-      0
-    ) ?? task.active_time_ms
-  }, index));
-  const modules = derivePersistedModules(session.modules, answers, tasks);
+  const tasks: never[] = [];
+  const modules: never[] = [];
   const questionActiveMs = sumPersistedMilliseconds(
     questions.map((question) => answers[question.id]?.active_time_ms ?? 0),
     'session.questions.active_time_ms'
@@ -77,12 +69,7 @@ export function serializeSessionForPersistence(session: PracticeSession): Practi
     ),
     pause_time_ms: toPersistedMilliseconds(section.pause_time_ms, `dynamic_sections.${index}.pause_time_ms`)
   }));
-  const attributedActiveMs = isDynamicSession(session)
-    ? questionActiveMs
-    : sumPersistedMilliseconds(
-        modules.map((scope) => scope.activeTimeMs),
-        'session.sections.active_ms'
-      );
+  const attributedActiveMs = questionActiveMs;
   const explicitUnattributed = toPersistedMilliseconds(
     session.unattributed_active_time_ms ?? 0,
     'session.unattributed_active_time_ms'
@@ -97,15 +84,10 @@ export function serializeSessionForPersistence(session: PracticeSession): Practi
     structure_mode: session.structure_mode,
     session_id: session.session_id,
     package_id: session.package_id,
-    ...(isDynamicSession(session)
-      ? { source_relative_path: session.source_relative_path }
-      : { source_path: session.source_path }),
+    source_relative_path: session.source_relative_path,
     mode: session.mode,
     timing_profile_id: session.timing_profile_id,
     timing_profile_version: session.timing_profile_version,
-    blueprint_id: session.blueprint_id,
-    blueprint_version: session.blueprint_version,
-    blueprint_override_package_id: session.blueprint_override_package_id,
     created_at: session.created_at,
     started_at: session.started_at,
     completed_at: session.completed_at,
@@ -260,52 +242,9 @@ function serializeAnswer(answer: AnswerRecord, questionId: string): AnswerRecord
   };
 }
 
-function derivePersistedModules(
-  modules: ModuleRuntimeState[],
-  answers: Record<string, AnswerRecord>,
-  tasks: PersistedTaskRuntime[]
-): ModuleRuntimeState[] {
-  return modules.map((scope, index) => {
-    toPersistedMilliseconds(scope.activeTimeMs, `modules.${index}.activeTimeMs`);
-    return {
-      id: scope.id,
-      section: scope.section,
-      kind: scope.kind,
-      label: scope.label,
-      status: scope.status,
-      questionIds: [...scope.questionIds],
-      activeTimeMs: sumPersistedMilliseconds(
-        scope.section === 'Writing' || scope.section === 'Speaking'
-          ? tasks
-              .filter((task) => task.question_ids.some((questionId) => scope.questionIds.includes(questionId)))
-              .map((task) => task.active_time_ms)
-          : scope.questionIds.map((questionId) => answers[questionId]?.active_time_ms ?? 0),
-        `modules.${index}.activeTimeMs`
-      ),
-      isOvertime: scope.isOvertime,
-      startedAt: scope.startedAt,
-      finalizedAt: scope.finalizedAt
-    };
-  });
-}
-
-function serializeTask(task: PersistedTaskRuntime, index: number): PersistedTaskRuntime {
-  const path = `tasks.${index}`;
-  return {
-    ...task,
-    task_id: task.task_id,
-    active_time_ms: toPersistedMilliseconds(task.active_time_ms, `${path}.active_time_ms`),
-    pause_time_ms: toPersistedMilliseconds(task.pause_time_ms, `${path}.pause_time_ms`),
-    remaining_ms: toNullablePersistedMilliseconds(task.remaining_ms, `${path}.remaining_ms`),
-    timer_limit_ms: toNullablePersistedMilliseconds(task.timer_limit_ms, `${path}.timer_limit_ms`)
-  };
-}
-
 function validateAggregateInputs(session: PracticeSession): void {
+  if (!isDynamicSession(session) || session.modules.length || session.tasks.length) throw new Error('UNSUPPORTED_SESSION_SCHEMA');
   toPersistedMilliseconds(session.active_ms, 'session.active_ms');
-  session.modules.forEach((scope, index) => {
-    toPersistedMilliseconds(scope.activeTimeMs, `modules.${index}.activeTimeMs`);
-  });
 }
 
 function sumPersistedMilliseconds(values: number[], fieldName: string): number {

@@ -1,2 +1,0 @@
-{"session_id":"synthetic-complete","seq":1,"monotonic_elapsed_ms":0,"wall_clock":"2026-07-19T01:00:00.000Z","event_type":"session_started","payload":{},"schema_version":"1.0.0"}
-{"session_id":"synthetic-complete","seq":2,"monotonic_elapsed_ms":3000,"wall_clock":"2026-07-19T01:00:04.000Z","event_type":"session_completed","payload":{},"schema_version":"1.0.0"}

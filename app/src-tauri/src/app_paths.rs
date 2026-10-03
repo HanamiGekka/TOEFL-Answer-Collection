@@ -1,4 +1,3 @@
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
@@ -10,6 +9,7 @@ use std::{
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct AppPaths {
     pub app_root: PathBuf,
+    #[serde(default)]
     pub source_root: PathBuf,
     pub records_root: PathBuf,
     pub typing_records_root: PathBuf,
@@ -26,15 +26,12 @@ pub struct AppPathsPreview {
     pub migrates_existing_data: bool,
     pub writable: bool,
     pub inside_app_root: bool,
-    pub source_status: String,
-    pub source_package_count: usize,
 }
 
 #[derive(Debug, Clone)]
 struct PathLocations {
     default_app_root: PathBuf,
     config_dir: PathBuf,
-    legacy_repo_root: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone)]
@@ -62,9 +59,8 @@ pub struct RuntimeMode {
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum RuntimeNoticeCode {
-    AppRootDefaultChangedWithLegacyData,
     AppPathsFallbackLastKnownGood,
-    LegacyPathSettingsLoadedReadOnly,
+
     AppPathsFallbackUserDefault,
 }
 
@@ -175,7 +171,6 @@ fn runtime_state() -> &'static RwLock<RuntimeState> {
             RwLock::new(initial_runtime_state(PathLocations {
                 default_app_root: root.join("app"),
                 config_dir: root.join("config"),
-                legacy_repo_root: None,
             }))
         })
     }
@@ -197,23 +192,10 @@ pub fn initialize_runtime_paths(
     let locations = PathLocations {
         default_app_root,
         config_dir,
-        legacy_repo_root: locate_legacy_repo_root(),
     };
     ACTIVE_STATE
         .set(RwLock::new(initial_runtime_state(locations)))
         .map_err(|_| "runtime paths have already been initialized".to_string())
-}
-
-fn locate_legacy_repo_root() -> Option<PathBuf> {
-    let starts = [std::env::current_exe().ok(), std::env::current_dir().ok()];
-    starts
-        .into_iter()
-        .flatten()
-        .flat_map(|path| path.ancestors().map(Path::to_path_buf).collect::<Vec<_>>())
-        .find(|candidate| {
-            candidate.join("app/src-tauri/tauri.conf.json").is_file()
-                && candidate.join("config").is_dir()
-        })
 }
 
 fn initial_runtime_state(locations: PathLocations) -> RuntimeState {
@@ -479,17 +461,6 @@ pub fn validate_app_paths(paths: &AppPaths, probe_writable: bool) -> AppPathsPre
         .collect::<Vec<_>>();
     let mut warnings = Vec::new();
     let mut creates = Vec::new();
-    let (source_status, source_package_count) = if paths.source_root.as_os_str().is_empty() {
-        ("UNCONFIGURED".to_string(), 0)
-    } else {
-        match inspect_source_root(&paths.source_root) {
-            Ok(count) => ("VALID".to_string(), count),
-            Err(error) => {
-                errors.push(error);
-                ("INVALID".to_string(), 0)
-            }
-        }
-    };
     let data_roots = [
         &paths.records_root,
         &paths.typing_records_root,
@@ -529,58 +500,12 @@ pub fn validate_app_paths(paths: &AppPaths, probe_writable: bool) -> AppPathsPre
         migrates_existing_data: false,
         writable,
         inside_app_root,
-        source_status,
-        source_package_count,
     }
-}
-
-pub fn inspect_source_root(source_root: &Path) -> Result<usize, String> {
-    if source_root.as_os_str().is_empty() {
-        return Err("SOURCE_ROOT_UNCONFIGURED".to_string());
-    }
-    if !source_root.is_absolute() || !source_root.is_dir() {
-        return Err("SOURCE_ROOT_INVALID".to_string());
-    }
-    source_root
-        .canonicalize()
-        .map_err(|_| "SOURCE_ROOT_INVALID".to_string())?;
-    let package_pattern = Regex::new(r"^(?:\d{2}\.\d{2}\.[A-Z]\.\d+|Mock\.\d{2}\.[A-Z]\.\d+)$")
-        .map_err(|error| error.to_string())?;
-    let mut count = 0;
-    for entry in fs::read_dir(source_root).map_err(|_| "SOURCE_ROOT_UNREADABLE".to_string())? {
-        let entry = entry.map_err(|_| "SOURCE_ROOT_UNREADABLE".to_string())?;
-        if entry
-            .file_type()
-            .map_err(|_| "SOURCE_ROOT_UNREADABLE".to_string())?
-            .is_dir()
-            && package_pattern.is_match(&entry.file_name().to_string_lossy())
-        {
-            count += 1;
-        }
-    }
-    Ok(count)
 }
 
 pub fn validate_controlled_roots(paths: &AppPaths) -> Result<(), String> {
-    if !paths.app_root.is_absolute()
-        || (!paths.source_root.as_os_str().is_empty() && !paths.source_root.is_absolute())
-    {
+    if !paths.app_root.is_absolute() {
         return Err("APP_PATHS_ABSOLUTE_REQUIRED".to_string());
-    }
-    if !paths.source_root.as_os_str().is_empty()
-        && paths_contain_each_other(&paths.app_root, &paths.source_root)
-    {
-        return Err("APP_ROOT_SOURCE_OVERLAP".to_string());
-    }
-    if !paths.source_root.as_os_str().is_empty() && paths.source_root.exists() {
-        let canonical_app_root = canonicalize_with_missing_tail(&paths.app_root)?;
-        let canonical_source_root = paths
-            .source_root
-            .canonicalize()
-            .map_err(|_| "SOURCE_ROOT_INVALID".to_string())?;
-        if paths_contain_each_other(&canonical_app_root, &canonical_source_root) {
-            return Err("APP_ROOT_SOURCE_OVERLAP".to_string());
-        }
     }
     let data_roots = [
         ("Records root", &paths.records_root),
@@ -594,17 +519,27 @@ pub fn validate_controlled_roots(paths: &AppPaths) -> Result<(), String> {
         if !path_is_within(root, &paths.app_root) {
             return Err("CONTROLLED_ROOT_INVALID".to_string());
         }
-        if !paths.source_root.as_os_str().is_empty()
-            && (path_is_within(root, &paths.source_root) || same_path(root, &paths.source_root))
-        {
-            return Err("CONTROLLED_ROOT_INVALID".to_string());
-        }
     }
     for (index, (_, left)) in data_roots.iter().enumerate() {
         for (_, right) in data_roots.iter().skip(index + 1) {
             if paths_contain_each_other(left, right) {
                 return Err("CONTROLLED_ROOT_INVALID".to_string());
             }
+        }
+    }
+    let canonical_root = canonicalize_with_missing_tail(&paths.app_root)?;
+    for root in [
+        paths.records_root.clone(),
+        paths.typing_records_root.clone(),
+        paths.trash_root.clone(),
+        paths.recovery_root(),
+        paths.app_root.join("logs"),
+        paths.app_root.join("config"),
+        paths.app_root.join("data"),
+    ] {
+        let canonical_child = canonicalize_with_missing_tail(&root)?;
+        if !path_is_within(&canonical_child, &canonical_root) {
+            return Err("CONTROLLED_ROOT_INVALID".to_string());
         }
     }
     Ok(())
@@ -694,65 +629,18 @@ fn probe_root_writable(root: &Path) -> Result<(), String> {
 }
 
 fn load_bootstrap_paths(locations: &PathLocations) -> BootstrapLoad {
-    let main = locations.config_dir.join("app-settings.local.json");
-    let lkg = locations
-        .config_dir
-        .join("app-settings.last-known-good.json");
-    let legacy_main = locations
-        .legacy_repo_root
-        .as_ref()
-        .map(|root| root.join("config/app-settings.local.json"));
-    let legacy_json = locations
-        .legacy_repo_root
-        .as_ref()
-        .map(|root| root.join("config/app-settings.json"));
-    let legacy_lkg = locations
-        .legacy_repo_root
-        .as_ref()
-        .map(|root| root.join("config/app-settings.last-known-good.json"));
-    let mut loaded = load_path_config_from(
-        &main,
-        &lkg,
-        legacy_main.as_deref(),
-        legacy_json.as_deref(),
-        legacy_lkg.as_deref(),
+    load_path_config_from(
+        &locations.config_dir.join("app-settings.local.json"),
+        &locations
+            .config_dir
+            .join("app-settings.last-known-good.json"),
         &locations.default_app_root,
-    );
-    if loaded.notice.is_none()
-        && loaded.paths.app_root == locations.default_app_root
-        && locations
-            .legacy_repo_root
-            .as_ref()
-            .is_some_and(|root| legacy_data_present(root))
-    {
-        loaded.notice = Some(RuntimeNoticeCode::AppRootDefaultChangedWithLegacyData);
-    }
-    loaded
-}
-
-fn legacy_data_present(root: &Path) -> bool {
-    ["records", "typing_records", "data/recovery", "trash"]
-        .into_iter()
-        .any(|name| {
-            fs::read_dir(root.join(name))
-                .ok()
-                .is_some_and(|mut entries| {
-                    entries.any(|entry| {
-                        entry
-                            .ok()
-                            .is_some_and(|value| value.file_name() != ".gitkeep")
-                    })
-                })
-        })
-        || root.join("data/answer_collection.sqlite3").is_file()
+    )
 }
 
 fn load_path_config_from(
     main: &Path,
     last_known_good: &Path,
-    legacy_main: Option<&Path>,
-    legacy_json: Option<&Path>,
-    legacy_last_known_good: Option<&Path>,
     default_app_root: &Path,
 ) -> BootstrapLoad {
     if let Some(paths) = read_valid_persisted_paths(main) {
@@ -765,16 +653,6 @@ fn load_path_config_from(
         return BootstrapLoad {
             paths,
             notice: Some(RuntimeNoticeCode::AppPathsFallbackLastKnownGood),
-        };
-    }
-    if let Some(paths) = legacy_main
-        .and_then(read_valid_persisted_paths)
-        .or_else(|| legacy_json.and_then(read_valid_persisted_paths))
-        .or_else(|| legacy_last_known_good.and_then(read_valid_persisted_paths))
-    {
-        return BootstrapLoad {
-            paths,
-            notice: Some(RuntimeNoticeCode::LegacyPathSettingsLoadedReadOnly),
         };
     }
     BootstrapLoad {
@@ -800,6 +678,50 @@ mod tests {
     use std::io::Write;
 
     #[test]
+    fn r009_data_root_ignores_legacy_source_and_derives_controlled_paths() {
+        let root = std::env::temp_dir().join(format!(
+            "r009-synthetic-data-root-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos()
+        ));
+        let legacy = AppPaths::for_root(&root, &root.join("old-source"));
+        assert!(validate_controlled_roots(&legacy).is_ok());
+        let changed = derive_user_paths(&root.join("new"), &legacy.source_root);
+        assert_eq!(changed.records_root, root.join("new/records"));
+        assert_eq!(changed.typing_records_root, root.join("new/typing_records"));
+        assert_eq!(changed.trash_root, root.join("new/trash"));
+        assert_eq!(changed.recovery_root(), root.join("new/data/recovery"));
+        assert_eq!(
+            changed.database_path(),
+            root.join("new/data/answer_collection.sqlite3")
+        );
+        assert_eq!(changed.source_root, legacy.source_root);
+        assert!(!root.join("new/records").exists());
+        fs::create_dir_all(&legacy.records_root).expect("old records");
+        fs::write(legacy.records_root.join("synthetic.txt"), b"old data").expect("old record");
+        crate::ensure_data_dirs_for_paths(&changed).expect("new data root");
+        assert_eq!(
+            fs::read(legacy.records_root.join("synthetic.txt")).expect("old data retained"),
+            b"old data"
+        );
+        assert!(!changed.records_root.join("synthetic.txt").exists());
+        fs::remove_dir_all(root).expect("synthetic fixture cleanup");
+    }
+
+    #[test]
+    fn r009_old_and_new_path_settings_deserialize() {
+        let old = r#"{"app_root":"C:\\Synthetic\\Data","source_root":"C:\\Synthetic\\Source","records_root":"C:\\Synthetic\\Data\\records","typing_records_root":"C:\\Synthetic\\Data\\typing_records","trash_root":"C:\\Synthetic\\Data\\trash"}"#;
+        let loaded: AppPaths = serde_json::from_str(old).expect("legacy settings");
+        assert_eq!(loaded.source_root, Path::new(r"C:\Synthetic\Source"));
+        let current = old.replace(",\"source_root\":\"C:\\\\Synthetic\\\\Source\"", "");
+        let loaded_current: AppPaths = serde_json::from_str(&current).expect("current settings");
+        assert!(loaded_current.source_root.as_os_str().is_empty());
+    }
+
+    #[test]
     fn r0086_public_path_errors_have_stable_codes() {
         let relative = AppPaths::for_root(Path::new("relative-app"), Path::new(""));
         assert_eq!(
@@ -807,96 +729,9 @@ mod tests {
             Err("APP_PATHS_ABSOLUTE_REQUIRED".to_string())
         );
         assert_eq!(
-            inspect_source_root(Path::new("")),
-            Err("SOURCE_ROOT_UNCONFIGURED".to_string())
-        );
-        assert_eq!(
             save_app_paths(relative, false, PathBuf::new(), 0),
             Err("APP_PATHS_CONFIRMATION_REQUIRED".to_string())
         );
-    }
-
-    #[test]
-    fn r0086_public_synthetic_package_matches_the_real_scanner() {
-        let samples = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples");
-        assert_eq!(inspect_source_root(&samples), Ok(1));
-        for section in ["Reading", "Listening", "Writing"] {
-            assert!(samples.join("Mock.99.Z.1").join(section).is_dir());
-        }
-        assert!(!samples.join("Mock.99.Z.1/Speaking").exists());
-    }
-
-    #[test]
-    fn r0085_production_startup_notices_use_stable_codes() {
-        let unique = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("clock")
-            .as_nanos();
-        let root =
-            std::env::temp_dir().join(format!("r0085-notices-{}-{unique}", std::process::id()));
-        let config = root.join("config");
-        let legacy = root.join("legacy");
-        fs::create_dir_all(&config).expect("config");
-        fs::create_dir_all(legacy.join("records")).expect("synthetic old records");
-        fs::write(legacy.join("records/fixture.txt"), b"synthetic").expect("fixture");
-        let default_app = root.join("user-data");
-        let locations = PathLocations {
-            default_app_root: default_app.clone(),
-            config_dir: config.clone(),
-            legacy_repo_root: Some(legacy.clone()),
-        };
-        assert_eq!(
-            load_bootstrap_paths(&locations).notice,
-            Some(RuntimeNoticeCode::AppRootDefaultChangedWithLegacyData)
-        );
-
-        let main = config.join("app-settings.local.json");
-        let lkg = config.join("app-settings.last-known-good.json");
-        fs::write(&main, b"{invalid").expect("invalid user setting");
-        let good = AppPaths::for_root(&root.join("app"), Path::new(""));
-        fs::write(&lkg, serde_json::to_vec(&good).expect("serialize")).expect("last known good");
-        assert_eq!(
-            load_path_config_from(&main, &lkg, None, None, None, &default_app).notice,
-            Some(RuntimeNoticeCode::AppPathsFallbackLastKnownGood)
-        );
-
-        let legacy_main = legacy.join("app-settings.local.json");
-        fs::write(&legacy_main, serde_json::to_vec(&good).expect("serialize"))
-            .expect("legacy setting");
-        assert_eq!(
-            load_path_config_from(
-                &config.join("missing"),
-                &config.join("missing-lkg"),
-                Some(&legacy_main),
-                None,
-                None,
-                &default_app
-            )
-            .notice,
-            Some(RuntimeNoticeCode::LegacyPathSettingsLoadedReadOnly)
-        );
-        assert_eq!(
-            load_path_config_from(
-                &main,
-                &config.join("missing-lkg"),
-                None,
-                None,
-                None,
-                &default_app
-            )
-            .notice,
-            Some(RuntimeNoticeCode::AppPathsFallbackUserDefault)
-        );
-        assert_eq!(
-            serde_json::to_value(RuntimeNoticeCode::AppRootDefaultChangedWithLegacyData)
-                .expect("code"),
-            serde_json::json!("APP_ROOT_DEFAULT_CHANGED_WITH_LEGACY_DATA")
-        );
-        assert_eq!(
-            validate_app_paths(&good, false).warnings,
-            vec!["APP_PATHS_NO_MIGRATION"]
-        );
-        fs::remove_dir_all(root).expect("synthetic fixture cleanup");
     }
 
     #[cfg(windows)]
@@ -918,7 +753,6 @@ mod tests {
             [
                 "app_root",
                 "records_root",
-                "source_root",
                 "trash_root",
                 "typing_records_root",
             ]
@@ -929,7 +763,6 @@ mod tests {
         );
         for root in [
             &paths.app_root,
-            &paths.source_root,
             &paths.records_root,
             &paths.typing_records_root,
             &paths.trash_root,
@@ -939,6 +772,7 @@ mod tests {
                 "example paths must be synthetic"
             );
         }
+        assert!(paths.source_root.as_os_str().is_empty());
     }
 
     #[test]
@@ -1011,16 +845,6 @@ mod tests {
     }
 
     #[test]
-    fn app_paths_never_place_data_inside_source_root() {
-        let root = std::env::temp_dir().join(format!("r006-paths-source-{}", std::process::id()));
-        let source = root.join("source");
-        fs::create_dir_all(&source).expect("source fixture");
-        let paths = AppPaths::for_root(&source.join("Answer_Collection"), &source);
-        assert!(!validate_app_paths(&paths, false).ok);
-        fs::remove_dir_all(root).expect("fixture cleanup");
-    }
-
-    #[test]
     fn app_paths_reject_overlapping_controlled_roots() {
         let root = std::env::temp_dir().join(format!("r006-paths-overlap-{}", std::process::id()));
         let source = root.join("source");
@@ -1060,7 +884,7 @@ mod tests {
         let good = AppPaths::for_root(&root.join("app"), &source);
         fs::write(&lkg, serde_json::to_vec(&good).expect("serialize LKG")).expect("write LKG");
 
-        let loaded = load_path_config_from(&main, &lkg, None, None, None, &root.join("default"));
+        let loaded = load_path_config_from(&main, &lkg, &root.join("default"));
         assert_eq!(loaded.paths, good);
         assert_eq!(
             loaded.notice,
@@ -1142,7 +966,7 @@ mod tests {
         );
         assert_ne!(invalid.paths.app_root, root);
         assert!(invalid.startup_notice.is_some());
-        assert!(validate_controlled_roots(&invalid.paths).is_err());
+        assert!(validate_controlled_roots(&invalid.paths).is_ok());
         fs::remove_dir_all(root).expect("fixture cleanup");
     }
 
@@ -1155,115 +979,11 @@ mod tests {
     }
 
     #[test]
-    fn r0083_source_preview_counts_only_package_directories_without_writing_to_source() {
-        let root =
-            std::env::temp_dir().join(format!("r0083-source-preview-{}", std::process::id()));
-        let source = root.join("source");
-        fs::create_dir_all(source.join("Mock.01.A.1")).expect("first synthetic package");
-        fs::create_dir_all(source.join("Mock.02.A.1")).expect("second synthetic package");
-        fs::create_dir_all(source.join("other")).expect("non-package directory");
-        fs::write(source.join("Mock.03.A.1"), b"synthetic file").expect("non-directory");
-        let before = fs::read_dir(&source)
-            .expect("source listing")
-            .map(|entry| entry.expect("entry").file_name())
-            .collect::<Vec<_>>();
-
-        let preview = validate_app_paths(&AppPaths::for_root(&root.join("app"), &source), true);
-        assert!(preview.ok, "{:?}", preview.errors);
-        assert_eq!(preview.source_status, "VALID");
-        assert_eq!(preview.source_package_count, 2);
-        let after = fs::read_dir(&source)
-            .expect("source listing")
-            .map(|entry| entry.expect("entry").file_name())
-            .collect::<Vec<_>>();
-        assert_eq!(before, after);
-        fs::remove_dir_all(root).expect("synthetic fixture cleanup");
-    }
-
-    #[test]
-    fn r0083_rejects_equal_and_nested_roots_but_allows_independent_source_change() {
-        let root = std::env::temp_dir().join(format!("r0083-root-overlap-{}", std::process::id()));
-        let app = root.join("app");
-        let source = root.join("source");
-        fs::create_dir_all(&app).expect("synthetic app");
-        fs::create_dir_all(&source).expect("synthetic source");
-        assert!(validate_controlled_roots(&AppPaths::for_root(&app, &app)).is_err());
-        assert!(validate_controlled_roots(&AppPaths::for_root(&app, &app.join("source"))).is_err());
-        assert!(
-            validate_controlled_roots(&AppPaths::for_root(&source.join("app"), &source)).is_err()
-        );
-        let original = AppPaths::for_root(&app, &source);
-        let changed = derive_user_paths(&original.app_root, &root.join("other-source"));
-        assert_eq!(changed.app_root, original.app_root);
-        assert_eq!(changed.records_root, original.records_root);
-        assert_ne!(changed.source_root, original.source_root);
-        fs::remove_dir_all(root).expect("synthetic fixture cleanup");
-    }
-
-    #[test]
-    fn r0083_user_config_precedes_legacy_and_legacy_is_read_only_fallback() {
-        let root = std::env::temp_dir().join(format!("r0083-config-{}", std::process::id()));
-        let user_config = root.join("user-config");
-        let legacy_config = root.join("legacy-config");
-        fs::create_dir_all(&user_config).expect("user config");
-        fs::create_dir_all(&legacy_config).expect("legacy config");
-        let main = user_config.join("app-settings.local.json");
-        let lkg = user_config.join("app-settings.last-known-good.json");
-        let legacy = legacy_config.join("app-settings.local.json");
-        let default_app = root.join("user-data");
-        let old = AppPaths::for_root(&root.join("old-app"), &root.join("missing-source"));
-        let old_bytes = serde_json::to_vec(&old).expect("serialize legacy");
-        fs::write(&legacy, &old_bytes).expect("legacy config");
-
-        let fallback = load_path_config_from(&main, &lkg, Some(&legacy), None, None, &default_app);
-        assert_eq!(fallback.paths, old);
-        assert_eq!(
-            fallback.notice,
-            Some(RuntimeNoticeCode::LegacyPathSettingsLoadedReadOnly)
-        );
-        let new_paths = AppPaths::for_root(&default_app, Path::new(""));
-        let content = serde_json::to_string(&new_paths).expect("serialize user config");
-        persist_settings_with(&main, &content, crate::atomic_write)
-            .expect("write only user config");
-        let selected = load_path_config_from(&main, &lkg, Some(&legacy), None, None, &default_app);
-        assert_eq!(selected.paths, new_paths);
-        assert_eq!(fs::read(&legacy).expect("legacy unchanged"), old_bytes);
-        fs::remove_dir_all(root).expect("synthetic fixture cleanup");
-    }
-
-    #[test]
-    fn r0083_old_repository_json_config_is_read_only_fallback() {
-        let root = std::env::temp_dir().join(format!("r0083-old-json-{}", std::process::id()));
-        fs::create_dir_all(&root).expect("synthetic fixture root");
-        let legacy_json = root.join("app-settings.json");
-        let old = AppPaths::for_root(&root.join("old-app"), &root.join("old-source"));
-        let bytes = serde_json::to_vec(&old).expect("serialize old settings");
-        fs::write(&legacy_json, &bytes).expect("old settings fixture");
-        let loaded = load_path_config_from(
-            &root.join("missing-main"),
-            &root.join("missing-lkg"),
-            None,
-            Some(&legacy_json),
-            None,
-            &root.join("user-data"),
-        );
-        assert_eq!(loaded.paths, old);
-        assert_eq!(
-            fs::read(&legacy_json).expect("old settings unchanged"),
-            bytes
-        );
-        fs::remove_dir_all(root).expect("synthetic fixture cleanup");
-    }
-
-    #[test]
     fn r0083_fresh_config_uses_injected_user_data_root_with_no_source() {
         let root = std::env::temp_dir().join(format!("r0083-fresh-{}", std::process::id()));
         let loaded = load_path_config_from(
             &root.join("missing-main"),
             &root.join("missing-lkg"),
-            None,
-            None,
-            None,
             &root.join("user-data"),
         );
         assert_eq!(loaded.paths.app_root, root.join("user-data"));

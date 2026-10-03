@@ -2,9 +2,7 @@ import { useTranslation } from 'react-i18next';
 import type { RuntimeNoticeCode } from '../lib/storage';
 
 const NOTICE_KEYS: Record<RuntimeNoticeCode, string> = {
-  APP_ROOT_DEFAULT_CHANGED_WITH_LEGACY_DATA: 'runtimeNotice.defaultAppRootChanged',
   APP_PATHS_FALLBACK_LAST_KNOWN_GOOD: 'runtimeNotice.fallbackLastKnownGood',
-  LEGACY_PATH_SETTINGS_LOADED_READ_ONLY: 'runtimeNotice.legacySettingsReadOnly',
   APP_PATHS_FALLBACK_USER_DEFAULT: 'runtimeNotice.fallbackUserDefault'
 };
 

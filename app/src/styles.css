@@ -577,16 +577,7 @@ h3 { color: var(--color-text-primary); }
   tab-size: 4;
 }
 
-.package-meta {
-  color: var(--color-text-secondary);
-  font-size: 0.86rem;
-  word-break: break-all;
-}
-
-.package-meta ul {
-  margin: 0.4rem 0 0;
-  padding-left: 1rem;
-}
+.path-current { overflow-wrap: anywhere; }
 
 .setup-note,
 .writing-policy-notice {
@@ -763,8 +754,7 @@ h3 { color: var(--color-text-primary); }
 }
 
 .summary-metrics span,
-.writing-metrics span,
-.speaking-task-list span {
+.writing-metrics span {
   display: grid;
   gap: 0.25rem;
   min-width: 0;
@@ -801,8 +791,7 @@ h3 { color: var(--color-text-primary); }
   overflow-wrap: anywhere;
 }
 
-.writing-task-editor,
-.speaking-task-runtime {
+.dynamic-long-text-editor {
   display: grid;
   gap: 0.8rem;
   min-width: 0;
@@ -817,9 +806,7 @@ h3 { color: var(--color-text-primary); }
   background: var(--color-canvas);
 }
 
-.writing-toolbar,
-.speaking-controls,
-.task-timing-row {
+.writing-toolbar {
   display: flex;
   flex-wrap: wrap;
   gap: 0.55rem;
@@ -831,20 +818,6 @@ h3 { color: var(--color-text-primary); }
   grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
   gap: 0.5rem;
 }
-
-.speaking-task-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-  gap: 0.45rem;
-}
-
-.speaking-task-list span.current {
-  border-color: var(--color-current);
-  outline: 3px solid var(--color-current);
-  background: var(--color-surface-warning);
-}
-
-.speaking-bottom-bar .muted { flex: 1 1 280px; }
 
 button:disabled,
 button[class]:disabled,

@@ -1,5 +1,4 @@
-import type { AnswerRecord, PracticeSession, TypingMinuteSample, TypingSnapshot } from '../types';
-import { renderStatus } from './answerState';
+import type { TypingMinuteSample, TypingSnapshot } from '../types';
 import { formatDuration } from './timer';
 
 export function escapeMarkdownTableCell(value: unknown): string {
@@ -11,46 +10,6 @@ export function escapeMarkdownTableCell(value: unknown): string {
 
 export function fenceText(value: string): string {
   return value.replace(/```/g, '`\\`\\`');
-}
-
-export function buildPracticeMarkdown(session: PracticeSession): string {
-  const lines: string[] = [
-    '# TOEFL Practice Record',
-    '',
-    `- Package: ${session.package_id}`,
-    `- Source: ${session.source_path}`,
-    `- Mode: ${session.mode}`,
-    `- Timing Profile: ${session.timing_profile_id}@${session.timing_profile_version}`,
-    `- Started: ${session.started_at ?? session.created_at}`,
-    `- Active Time: ${formatDuration(session.active_ms)}`,
-    `- Paused Time: ${formatDuration(session.paused_ms)}`,
-    ''
-  ];
-
-  for (const section of ['Reading', 'Listening', 'Writing', 'Speaking'] as const) {
-    const sectionQuestions = session.questions.filter((question) => question.section === section);
-    if (sectionQuestions.length === 0) continue;
-    lines.push(`## ${section}`, '');
-    lines.push('| Q | Type | Final Answer | First Time | Total Time | Revisions | Status |');
-    lines.push('|---:|---|---|---:|---:|---:|---|');
-    for (const question of sectionQuestions) {
-      const answer: AnswerRecord | undefined = session.answers[question.id];
-      lines.push(
-        [
-          question.number,
-          escapeMarkdownTableCell(question.type_label),
-          escapeMarkdownTableCell(summarizeAnswer(answer?.answer_value)),
-          answer?.first_answer_elapsed_ms != null ? formatDuration(answer.first_answer_elapsed_ms) : '—',
-          answer ? formatDuration(answer.total_active_ms) : '—',
-          answer?.revision_count ?? 0,
-          answer ? renderStatus(answer.status, answer.is_skipped, answer.is_overtime) : 'NOT_ENCOUNTERED'
-        ].join(' | ').replace(/^/, '| ') + ' |'
-      );
-    }
-    lines.push('');
-  }
-
-  return lines.join('\n');
 }
 
 export function summarizeAnswer(answer: unknown): string {

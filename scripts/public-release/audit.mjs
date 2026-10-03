@@ -42,7 +42,8 @@ function verifyReviewedIcon(path, buffer) {
 function sourceFiles() {
   const result = spawnSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], { cwd: sourceRoot, encoding: 'buffer' });
   assert(result.status === 0, 'Cannot enumerate source files from Git');
-  return [...new Set(result.stdout.toString('utf8').split('\0').filter(Boolean).map(normalized))].sort();
+  return [...new Set(result.stdout.toString('utf8').split('\0').filter(Boolean).map(normalized))]
+    .filter((path) => existsSync(resolve(sourceRoot, path))).sort();
 }
 
 function copyAllowedFiles(candidate) {
@@ -108,30 +109,29 @@ function auditCandidate(root) {
     assert(!/\b[A-Za-z]:[\\/](?:Users|留学|日常工作|Program Files)[\\/]/u.test(content), `Local machine path in public file: ${path}`);
     assert(!/\b(?:ghp_|github_pat_)[A-Za-z0-9_]{20,}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/u.test(content), `Credential material in public file: ${path}`);
     assert(!content.includes(privateSessionId) && !content.includes(privateProfileNumber), `Private identity in public file: ${path}`);
-    if (path.startsWith('samples/Mock.99.Z.1/')) assert(content.startsWith('SYNTHETIC STRUCTURE ONLY'), `Non-synthetic sample: ${path}`);
     if (path.endsWith('.md')) verifyMarkdownLinks(root, path, content);
   }
   for (const path of reviewedIcons.keys()) assert(files.includes(path), `Missing reviewed icon: ${path}`);
-  for (const needed of ['LICENSE', 'README.md', 'docs/development/CHANGELOG.md', 'docs/development/ROADMAP.md', 'samples/README.md']) {
+  for (const needed of ['LICENSE', 'README.md', 'docs/development/CHANGELOG.md', 'docs/development/ROADMAP.md']) {
     assert(files.includes(needed), `Missing public file: ${needed}`);
   }
   assert(!files.some((path) => /^README\.(?:zh-CN|ja|zh-TW)\.md$/u.test(path)), 'Obsolete localized README copied');
-  const license = readFileSync(join(root, 'LICENSE'), 'utf8');
+  const license = readFileSync(join(root, 'LICENSE'), 'utf8').replaceAll('\r\n', '\n');
   assert(license.startsWith('MIT License\n') && license.includes('Permission is hereby granted'), 'MIT license is missing or invalid');
-  const version = '1.0.0';
-  assert(readFileSync(join(root, 'VERSION'), 'utf8').trim() === version, 'Public VERSION must be 1.0.0');
+  const version = readFileSync(join(root, 'VERSION'), 'utf8').trim();
+  assert(version === '1.0.1', 'Public VERSION must be the reviewed R009 version');
   const npmPackage = JSON.parse(readFileSync(join(root, 'app/package.json'), 'utf8'));
   const npmLock = JSON.parse(readFileSync(join(root, 'app/package-lock.json'), 'utf8'));
   const tauri = JSON.parse(readFileSync(join(root, 'app/src-tauri/tauri.conf.json'), 'utf8'));
   const cargoToml = readFileSync(join(root, 'app/src-tauri/Cargo.toml'), 'utf8');
-  const cargoLock = readFileSync(join(root, 'app/src-tauri/Cargo.lock'), 'utf8');
+  const cargoLock = readFileSync(join(root, 'app/src-tauri/Cargo.lock'), 'utf8').replaceAll('\r\n', '\n');
   const appConstants = readFileSync(join(root, 'app/src/constants.ts'), 'utf8');
   assert(npmPackage.version === version && npmLock.version === version && npmLock.packages[''].version === version, 'Public npm version mismatch');
   assert(tauri.version === version, 'Public Tauri version mismatch');
-  assert(cargoToml.split('[lib]')[0].includes('version = "1.0.0"'), 'Public Cargo package version mismatch');
-  assert(cargoLock.includes('name = "toefl-answer-collection"\nversion = "1.0.0"'), 'Public Cargo lock version mismatch');
-  assert(appConstants.includes("APP_VERSION = '1.0.0'"), 'Public application display version mismatch');
-  const readme = readFileSync(join(root, 'README.md'), 'utf8');
+  assert(cargoToml.split('[lib]')[0].includes(`version = "${version}"`), 'Public Cargo package version mismatch');
+  assert(cargoLock.includes(`name = "toefl-answer-collection"\nversion = "${version}"`), 'Public Cargo lock version mismatch');
+  assert(appConstants.includes(`APP_VERSION = '${version}'`), 'Public application display version mismatch');
+  const readme = readFileSync(join(root, 'README.md'), 'utf8').replaceAll('\r\n', '\n');
   const sections = [
     ['english', 'English'],
     ['simplified-chinese', '简体中文'],
@@ -147,9 +147,16 @@ function auditCandidate(root) {
   assert(positions.every((position, index) => index === 0 || position > positions[index - 1]), 'Wrong README language order');
   for (let index = 0; index < positions.length; index += 1) {
     const content = readme.slice(positions[index], positions[index + 1]);
-    for (const fact of ['v1.0.0', '/releases/tag/v1.0.0', 'ETS', '(LICENSE)', '(samples/README.md)', 'APP_ROOT', 'SOURCE_ROOT', 'WebView2', 'Node.js', 'Rust']) {
+    for (const fact of ['v1.0.1', '/releases/tag/v1.0.1', 'ETS', '(LICENSE)', 'WebView2', 'Node.js', 'Rust']) {
       assert(content.includes(fact), `Missing README fact in ${sections[index][1]}: ${fact}`);
     }
+    const currentFacts = [
+      ['Training name', 'Data folder', 'local-first', 'official TOEFL questions'],
+      ['训练名称', '数据文件夹', '以本地为主', '不分发官方 TOEFL'],
+      ['練習名', 'データフォルダー', 'ローカル優先', '公式 TOEFL'],
+      ['練習名稱', '資料資料夾', '以本機為優先', '不散布官方 TOEFL'],
+    ][index];
+    for (const fact of currentFacts) assert(content.includes(fact), `Missing current README fact in ${sections[index][1]}: ${fact}`);
   }
   assert(!existsSync(join(root, 'Demand')) && !existsSync(join(root, 'temp')) && !existsSync(join(root, 'records')), 'Private directory copied');
   return files.length;
@@ -199,7 +206,7 @@ function selfCheck(root) {
   writeFileSync(versionPath, '1.0-dev\n');
   try {
     let rejected = false;
-    try { auditCandidate(root); } catch (error) { rejected = String(error).includes('Public VERSION must be 1.0.0'); }
+    try { auditCandidate(root); } catch (error) { rejected = String(error).includes('Public VERSION must be the reviewed R009 version'); }
     assert(rejected, 'Public audit did not reject a prerelease version');
   } finally {
     writeFileSync(versionPath, originalVersion);

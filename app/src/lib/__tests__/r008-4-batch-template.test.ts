@@ -36,7 +36,7 @@ describe('R008.4 batch engine', () => {
     }
     expect(created.session.dynamic_sections.find((entry) => entry.section_id === section)?.next_item_ordinal).toBe(count + 1);
     expect(validateDynamicSession(created.session).ok).toBe(true);
-    expect(prepareRecoverySession(JSON.stringify(created.session), [])).toMatchObject({ ok: true });
+    expect(prepareRecoverySession(JSON.stringify(created.session))).toMatchObject({ ok: true });
   });
 
   it('allocates sequential identities across ordered blocks and navigates until creation is needed', () => {
@@ -95,7 +95,7 @@ describe('R008.4 batch engine', () => {
       ['Reading', 'reading_word_blank', 10], ['Reading', 'reading_academic_single_choice', 5],
       ['Listening', 'listening_academic_lecture_single_choice', 4], ['Writing', 'writing_build_sentence', 10]
     ] as const) session = createDynamicItemBatch(session, section, [{ config: getItemTypePreset(section, typeId), count }], now).session;
-    const recovered = prepareRecoverySession(JSON.stringify(serializeSessionForPersistence(session)), []);
+    const recovered = prepareRecoverySession(JSON.stringify(serializeSessionForPersistence(session)));
     expect(recovered).toMatchObject({ ok: true, migrated: false });
     if (!recovered.ok) return;
     expect(recovered.session.questions.map((item) => item.id)).toEqual(session.questions.map((item) => item.id));

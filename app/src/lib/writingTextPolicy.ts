@@ -64,11 +64,7 @@ export function writingTextNeedsCompatibilityNotice(session: PracticeSession): b
       .filter((question) => question.section_id === 'Writing')
       .map((question) => question.id)
   );
-  return session.tasks.some((task) =>
-    task.section_id === 'Writing' &&
-    typeof task.text === 'string' &&
-    sanitizeWritingText(task.text).rejected_count > 0
-  ) || Object.entries(session.answers).some(([questionId, answer]) =>
+  return Object.entries(session.answers).some(([questionId, answer]) =>
     writingQuestionIds.has(questionId) &&
     typeof answer.answer_value === 'string' &&
     sanitizeWritingText(answer.answer_value).rejected_count > 0

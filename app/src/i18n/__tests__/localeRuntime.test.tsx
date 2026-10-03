@@ -61,9 +61,7 @@ describe('R008.5 locale runtime', () => {
 
   it('renders each production startup notice in all four locales and switches a visible notice live', async () => {
     const codes = [
-      'APP_ROOT_DEFAULT_CHANGED_WITH_LEGACY_DATA',
       'APP_PATHS_FALLBACK_LAST_KNOWN_GOOD',
-      'LEGACY_PATH_SETTINGS_LOADED_READ_ONLY',
       'APP_PATHS_FALLBACK_USER_DEFAULT'
     ] as const;
     for (const code of codes) {

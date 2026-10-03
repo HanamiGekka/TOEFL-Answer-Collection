@@ -1,6 +1,6 @@
 {
   "name": "toefl-answer-collection",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "engines": {
     "node": ">=24.18.0 <25"
@@ -21,8 +21,6 @@
     "audit:i18n": "node scripts/audit-i18n.mjs",
     "audit:public-release": "node ../scripts/public-release/audit.mjs",
     "audit:session": "node scripts/audit-session-export.mjs",
-    "verify:r0071-auditor": "vitest run --run scripts/r0071-blueprint-audit.test.mjs",
-    "verify:r0072.1-lifecycle": "node scripts/verify-r0072-1-lifecycle.mjs",
     "verify:r0073-dynamic": "node scripts/verify-r0073-dynamic.mjs",
     "e2e": "playwright test"
   },
@@ -44,8 +42,8 @@
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
-    "@typescript-eslint/eslint-plugin": "^7.18.0",
-    "@typescript-eslint/parser": "^7.18.0",
+    "@typescript-eslint/eslint-plugin": "8.71.0",
+    "@typescript-eslint/parser": "8.71.0",
     "@vitejs/plugin-react": "^4.3.1",
     "eslint": "^8.57.0",
     "eslint-plugin-react-hooks": "^4.6.2",

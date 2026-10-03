@@ -115,36 +115,17 @@ export function deriveTimingLedger(
   }
 
   const tasks: Record<string, number> = {};
-  for (const task of session.tasks) {
-    tasks[task.task_id] = task.question_ids.reduce((sum, questionId) => sum + (questions[questionId] ?? 0), 0);
-  }
-
   const scopes: Partial<Record<RuntimeScopeId, number>> = {};
-  const sections: Record<SectionName, number> = { Reading: 0, Listening: 0, Writing: 0, Speaking: 0 };
+  const sections: Record<SectionName, number> = { Reading: 0, Listening: 0, Writing: 0 };
   if (isDynamicSession(session)) {
     for (const section of session.dynamic_sections) {
       const sectionTime = section.item_ids.reduce((sum, itemId) => sum + (questions[itemId] ?? 0), 0);
       scopes[section.section_id] = sectionTime;
       sections[section.section_id] = sectionTime;
     }
-  } else for (const scope of session.modules) {
-    const scopeTaskIds = session.tasks
-      .filter((task) => task.question_ids.some((questionId) => scope.questionIds.includes(questionId)))
-      .map((task) => task.task_id);
-    const scopeTime = scope.section === 'Writing' || scope.section === 'Speaking'
-      ? scopeTaskIds.reduce((sum, taskId) => sum + (tasks[taskId] ?? 0), 0)
-      : scope.questionIds.reduce((sum, questionId) => sum + (questions[questionId] ?? 0), 0);
-    scopes[scope.id] = scopeTime;
-    sections[scope.section] += scopeTime;
   }
   const attributedActiveMs = Object.values(sections).reduce((sum, value) => sum + value, 0);
-  const questionActiveMs = Object.values(questions).reduce((sum, value) => sum + value, 0);
-  const unattributedActiveMs = isDynamicSession(session)
-    ? nonNegative(session.unattributed_active_time_ms ?? 0)
-    : Math.max(
-        nonNegative(session.unattributed_active_time_ms ?? 0),
-        Math.max(0, questionActiveMs - attributedActiveMs)
-      );
+  const unattributedActiveMs = nonNegative(session.unattributed_active_time_ms ?? 0);
   return {
     questions,
     tasks,
@@ -162,14 +143,8 @@ export function applyDerivedTiming(session: PracticeSession): PracticeSession {
     ...session,
     active_ms: ledger.sessionActiveMs,
     unattributed_active_time_ms: ledger.unattributedActiveMs,
-    tasks: session.tasks.map((task) => ({
-      ...task,
-      active_time_ms: ledger.tasks[task.task_id] ?? task.active_time_ms
-    })),
-    modules: session.modules.map((scope) => ({
-      ...scope,
-      activeTimeMs: ledger.scopes[scope.id] ?? 0
-    })),
+    tasks: [],
+    modules: [],
     dynamic_sections: session.dynamic_sections?.map((section) => ({
       ...section,
       active_time_ms: ledger.sections[section.section_id]

@@ -2,8 +2,6 @@ import { useAppStore } from '../store/appStore';
 import { useTranslation } from 'react-i18next';
 import { getItemTypeDisplayLabel } from '../i18n/displayLabels';
 import { formatDuration } from '../lib/timer';
-import { getCurrentModule } from '../lib/sessionEngine';
-import { getCurrentTask, getTaskTimingState, isLongWritingTask, taskStatusLabel } from '../lib/taskRuntime';
 import { isDynamicSession } from '../lib/dynamicSession';
 
 export function TopBar() {
@@ -14,8 +12,6 @@ export function TopBar() {
   const hideTimes = useAppStore((state) => state.hideTimes);
   const toggleHideTimes = useAppStore((state) => state.toggleHideTimes);
   const saveStatus = useAppStore((state) => state.saveStatus);
-  const taskActiveMs = useAppStore((state) => state.taskActiveMs);
-  const taskRemainingMs = useAppStore((state) => state.taskRemainingMs);
   const question = session?.questions.find((item) => item.id === session.current_question_id);
 
   if (!session) return null;
@@ -30,12 +26,6 @@ export function TopBar() {
   }
   if (!question) return null;
   const sectionTotal = session.active_section_question_ids.length;
-  const currentModule = getCurrentModule(session);
-  const currentTask = getCurrentTask(session);
-  const currentTaskOvertime = isLongWritingTask(currentTask)
-    ? getTaskTimingState(currentTask, taskActiveMs).is_overtime
-    : Boolean(currentTask?.is_overtime);
-
   return (
     <header className="top-bar">
       <div>
@@ -43,17 +33,13 @@ export function TopBar() {
         <span className="nowrap">{t(session.mode === 'practice' ? 'setup.practiceMode' : 'setup.examMode')}</span>
       </div>
       <div className="current-question-title">
-        <strong>{t(`section.${question.section.toLowerCase()}`)} · {t(isDynamicSession(session) ? 'topBar.dynamicPosition' : 'topBar.position', { number: question.number, total: sectionTotal })}</strong>
-        {currentModule ? <span>{currentModule.label}</span> : null}
-        {currentTask ? <span>{currentTask.task_id} · {taskStatusLabel(currentTask)}</span> : null}
-        {currentTaskOvertime ? <span className="danger">{t('common.overtime')}</span> : null}
+        <strong>{t(`section.${question.section.toLowerCase()}`)} · {t('topBar.dynamicPosition', { number: question.number, total: sectionTotal })}</strong>
         <span>{t('answer.type', { name: question.type_config ? getItemTypeDisplayLabel(question.type_config, i18n.language) : question.type_label })}</span>
       </div>
       <div>
         <button className="ghost" onClick={toggleHideTimes}>{t(hideTimes ? 'topBar.showTime' : 'topBar.hideTime')}</button>
         <span>{t('topBar.currentScope')}</span>
         <span className={isPaused ? 'timer paused' : 'timer'}>{hideTimes ? '••:••' : formatDuration(scopeActiveMs)}</span>
-        {currentTask && taskRemainingMs !== null ? <span>{t('topBar.taskRemaining', { time: hideTimes ? '••:••' : formatDuration(taskRemainingMs) })}</span> : null}
         <span>{t(isPaused ? 'status.paused' : 'status.timing')}</span>
         <span>{t('topBar.saveStatus', { status: t(`status.save.${saveStatus}`) })}</span>
       </div>

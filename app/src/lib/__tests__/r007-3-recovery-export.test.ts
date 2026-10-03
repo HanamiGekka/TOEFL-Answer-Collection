@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AnswerRecord, PracticeSession } from '../../types';
+import type { AnswerRecord } from '../../types';
 import {
   createDynamicItem,
   createDynamicSession,
@@ -11,7 +11,6 @@ import { createCustomItemType, getItemTypePreset } from '../itemTypeRegistry';
 import { serializeSessionForPersistence } from '../persistedTime';
 import { prepareRecoverySession } from '../recovery';
 import { buildSessionExportBundle } from '../sessionExport';
-import { buildInitialSessionRuntime, createDefaultQuestions } from '../sessionEngine';
 import { buildSessionRecordIndex } from '../exporters';
 
 const NOW = '2026-08-03T02:00:00.000Z';
@@ -47,7 +46,7 @@ function dynamicFixture(): DynamicPracticeSession {
   let session = createDynamicSession({
     session_id: 'r0073-recovery-export',
     package_id: 'Mock.01.A.1',
-    source_path: 'readonly-package-metadata',
+    source_relative_path: 'readonly-package-metadata',
     mode: 'practice',
     selected_sections: ['Reading', 'Listening', 'Writing'],
     created_at: NOW
@@ -129,7 +128,7 @@ describe('R007.3 schema v6 Recovery', () => {
     const persisted = serializeSessionForPersistence(session);
     expect(persisted.source_relative_path).toBe('Mock.01.A.1');
     expect(persisted.source_path).toBeUndefined();
-    const prepared = prepareRecoverySession(JSON.stringify(persisted), []);
+    const prepared = prepareRecoverySession(JSON.stringify(persisted));
     expect(prepared.ok).toBe(true);
     const bundle = buildSessionExportBundle(session, []);
     const index = buildSessionRecordIndex(session, bundle.directory, Object.keys(bundle.files));
@@ -141,7 +140,7 @@ describe('R007.3 schema v6 Recovery', () => {
 
   it('round-trips dynamic identity, registry, answers, timing, options, ordinal, and long-text draft without Blueprint', () => {
     const persisted = serializeSessionForPersistence(dynamicFixture());
-    const prepared = prepareRecoverySession(JSON.stringify(persisted), []);
+    const prepared = prepareRecoverySession(JSON.stringify(persisted));
 
     expect(prepared.ok).toBe(true);
     if (!prepared.ok) return;
@@ -155,7 +154,7 @@ describe('R007.3 schema v6 Recovery', () => {
       tasks: [],
       current_question_id: 'W1'
     });
-    expect(prepared.session.blueprint_id).toBeUndefined();
+    expect(prepared.session).not.toHaveProperty('blueprint_id');
     expect(prepared.session.dynamic_sections?.map((section) => [section.section_id, section.item_ids, section.next_item_ordinal])).toEqual([
       ['Reading', ['R1', 'R2'], 3],
       ['Listening', ['L1'], 2],
@@ -172,7 +171,7 @@ describe('R007.3 schema v6 Recovery', () => {
 
   it('rejects malformed v6 dynamic snapshots instead of falling through legacy migration', () => {
     const invalid = { ...dynamicFixture(), modules: [{ id: 'forbidden-module' }] };
-    expect(prepareRecoverySession(invalid, [])).toMatchObject({ ok: false, code: 'INVALID_SNAPSHOT' });
+    expect(prepareRecoverySession(invalid)).toMatchObject({ ok: false, code: 'INVALID_SNAPSHOT' });
   });
 });
 
@@ -230,38 +229,5 @@ describe('R007.3 schema v6 exports', () => {
     });
     expect(index.selected_sections).toEqual(['Reading', 'Listening', 'Writing']);
     expect(index.legacy_label).toBeUndefined();
-  });
-});
-
-describe('R007.3 legacy Recovery compatibility', () => {
-  it('continues a schema v5 snapshot as legacy instead of converting it to dynamic Items', () => {
-    const legacy = buildInitialSessionRuntime({
-      session_schema_version: 5,
-      session_id: 'legacy-v5',
-      package_id: 'legacy-package',
-      source_path: 'readonly',
-      mode: 'practice',
-      timing_profile_id: 'legacy',
-      timing_profile_version: '1',
-      blueprint_id: 'toefl-2026-default',
-      blueprint_version: '1.3.0',
-      created_at: NOW,
-      active_ms: 0,
-      paused_ms: 0,
-      current_section: 'Speaking',
-      current_question_index: 0,
-      questions: createDefaultQuestions(['Speaking']),
-      answers: {},
-      modules: [],
-      tasks: [],
-      view: 'PRACTICE'
-    } satisfies Partial<PracticeSession>);
-    const prepared = prepareRecoverySession(legacy, ['toefl-2026-default']);
-    expect(prepared.ok).toBe(true);
-    if (!prepared.ok) return;
-    expect(prepared.session.session_schema_version).toBe(5);
-    expect(prepared.session.structure_mode).toBeUndefined();
-    expect(prepared.session.dynamic_sections).toBeUndefined();
-    expect(prepared.migrated).toBe(false);
   });
 });

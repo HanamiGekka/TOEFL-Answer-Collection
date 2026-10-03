@@ -17,7 +17,7 @@ export interface LocalRecordSummary {
   blueprint_version?: string;
   structure_mode?: string;
   section_item_counts?: Record<string, number>;
-  legacy_label?: 'LEGACY V5';
+  legacy_label?: string;
   selected_sections: string[];
   active_time_ms: number;
   pause_time_ms: number;

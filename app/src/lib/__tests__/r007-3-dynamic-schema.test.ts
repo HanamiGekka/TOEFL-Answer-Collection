@@ -10,7 +10,6 @@ import {
   getItemTypePreset,
   validateItemTypeConfig
 } from '../itemTypeRegistry';
-import { DEFAULT_BLUEPRINT } from '../blueprint';
 
 const sessionInput = {
   session_id: 'r0073-schema',
@@ -22,12 +21,7 @@ const sessionInput = {
 };
 
 describe('R007.3 schema v6 dynamic manual factory', () => {
-  it('marks the fixed Blueprint as disabled for new Sessions while retaining it for legacy reads', () => {
-    expect(DEFAULT_BLUEPRINT.lifecycle_status).toBe('LEGACY_NEW_SESSION_DISABLED');
-    expect(DEFAULT_BLUEPRINT.sections.length).toBeGreaterThan(0);
-  });
-
-  it('creates only empty Reading, Listening, and Writing Sections without Blueprint, Module, Task, or Speaking', () => {
+  it('creates only empty Reading, Listening, and Writing Sections without Blueprint, Module, Task, or unsupported sections', () => {
     const session = createDynamicSession(sessionInput);
 
     expect(session).toMatchObject({
@@ -37,8 +31,8 @@ describe('R007.3 schema v6 dynamic manual factory', () => {
       modules: [],
       tasks: []
     });
-    expect(session.blueprint_id).toBeUndefined();
-    expect(session.blueprint_version).toBeUndefined();
+    expect(session).not.toHaveProperty('blueprint_id');
+    expect(session).not.toHaveProperty('blueprint_version');
     expect(session.source_relative_path).toBe('01.21.A.1');
     expect(session.source_path).toBeUndefined();
     expect(session.dynamic_sections.map((section) => section.section_id)).toEqual([
@@ -52,11 +46,11 @@ describe('R007.3 schema v6 dynamic manual factory', () => {
     expect(validateDynamicSession(session)).toEqual({ ok: true, errors: [] });
   });
 
-  it('rejects Speaking and ignores package contents when creating the new runtime', () => {
+  it('rejects unsupported sections and ignores external package contents when creating the new runtime', () => {
     expect(() => createDynamicSession({
       ...sessionInput,
-      selected_sections: ['Reading', 'Speaking'] as never
-    })).toThrow(/Speaking/);
+      selected_sections: ['Reading', 'Unsupported'] as never
+    })).toThrow(/Reading, Listening, and Writing/);
 
     const first = createDynamicSession(sessionInput);
     const second = createDynamicSession({ ...sessionInput, package_id: '07.26.B.9' });
@@ -121,7 +115,7 @@ describe('R007.3 safe item type registry', () => {
       renderer: 'long_text'
     });
     expect(validateItemTypeConfig({ ...config, renderer: 'remote_component' as never }).ok).toBe(false);
-    expect(validateItemTypeConfig({ ...config, section_compatibility: ['Speaking'] as never }).ok).toBe(false);
+    expect(validateItemTypeConfig({ ...config, section_compatibility: ['Unsupported'] as never }).ok).toBe(false);
   });
 });
 

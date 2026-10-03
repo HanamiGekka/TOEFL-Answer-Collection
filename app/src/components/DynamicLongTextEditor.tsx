@@ -66,7 +66,7 @@ export function DynamicLongTextEditor() {
 
   const label = item.type_config ? getItemTypeDisplayLabel(item.type_config, i18n.language) : item.type_label;
   return (
-    <div className="writing-task-editor dynamic-long-text-editor">
+    <div className="dynamic-long-text-editor">
       <div className="task-timing-row">
         <span>{t('writing.activeTime', { time: formatDuration(questionActiveMs) })}</span>
         <span className={overtime ? 'danger-text' : ''}>{t('writing.remaining', { time: remaining === null ? t('writing.unlimited') : formatDuration(remaining) })}</span>

@@ -1,9 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { EventLogEntry, PackageSummary, PracticeSession } from '../types';
+import type { EventLogEntry, PracticeSession } from '../types';
 import { BROWSER_PREVIEW_APP_ROOT } from '../constants';
 import { serializeEventForPersistence, serializeSessionForPersistence, toPersistedMilliseconds } from './persistedTime';
 import type { LocalRecordSummary, RecordActionResult } from './recordManager';
-import type { BlueprintOverride } from './blueprint';
 
 export interface AppPaths {
   app_root: string;
@@ -22,8 +21,6 @@ export interface AppPathsPreview {
   migrates_existing_data: boolean;
   writable: boolean;
   inside_app_root: boolean;
-  source_status: 'UNCONFIGURED' | 'VALID' | 'INVALID';
-  source_package_count: number;
 }
 
 export interface RuntimeMode {
@@ -34,9 +31,7 @@ export interface RuntimeMode {
 }
 
 export type RuntimeNoticeCode =
-  | 'APP_ROOT_DEFAULT_CHANGED_WITH_LEGACY_DATA'
   | 'APP_PATHS_FALLBACK_LAST_KNOWN_GOOD'
-  | 'LEGACY_PATH_SETTINGS_LOADED_READ_ONLY'
   | 'APP_PATHS_FALLBACK_USER_DEFAULT';
 
 export interface AppConfigurationContext {
@@ -91,13 +86,6 @@ export async function ensureDataDirs(): Promise<void> {
 
 export async function initDatabase(): Promise<void> {
   if (inTauri()) await invoke('init_database');
-}
-
-export async function scanPackages(): Promise<PackageSummary[]> {
-  if (inTauri()) {
-    return invoke<PackageSummary[]>('scan_packages');
-  }
-  return [];
 }
 
 export async function saveSessionSnapshot(
@@ -277,16 +265,8 @@ export async function selectAppRootDirectory(defaultPath: string, title: string)
   return typeof selected === 'string' ? selected : null;
 }
 
-export async function selectSourceRootDirectory(defaultPath: string, title: string): Promise<string | null> {
-  if (!inTauri()) return null;
-  const { open } = await import('@tauri-apps/plugin-dialog');
-  const selected = await open({
-    directory: true,
-    multiple: false,
-    ...(defaultPath ? { defaultPath } : {}),
-    title
-  });
-  return typeof selected === 'string' ? selected : null;
+export async function openDataFolder(): Promise<void> {
+  if (inTauri()) await invoke('open_data_folder');
 }
 
 export async function getRuntimeMode(): Promise<RuntimeMode> {
@@ -304,9 +284,7 @@ export async function previewAppPaths(paths: AppPaths): Promise<AppPathsPreview>
     errors: [],
     migrates_existing_data: false,
     writable: true,
-    inside_app_root: true,
-    source_status: paths.source_root ? 'VALID' : 'UNCONFIGURED',
-    source_package_count: 0
+    inside_app_root: true
   };
 }
 
@@ -347,10 +325,6 @@ export async function saveAppSetting(key: string, value: unknown): Promise<void>
   else localStorage.setItem(`app-setting:${key}`, JSON.stringify(value));
 }
 
-export async function loadBlueprintOverride(packageId: string): Promise<BlueprintOverride | undefined> {
-  if (!inTauri()) return undefined;
-  return (await invoke<BlueprintOverride | null>('load_blueprint_override', { packageId })) ?? undefined;
-}
 
 /** @deprecated Use a root-specific open function. */
 export const openExportDirectory = openSessionExportDirectory;

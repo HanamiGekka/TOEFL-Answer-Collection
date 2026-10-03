@@ -24,7 +24,7 @@ function fresh(): DynamicPracticeSession {
 }
 
 function recover(session: DynamicPracticeSession) {
-  return prepareRecoverySession(JSON.stringify(serializeSessionForPersistence(session)), []);
+  return prepareRecoverySession(JSON.stringify(serializeSessionForPersistence(session)));
 }
 
 function syntheticAnswer(itemId: string, value: string): AnswerRecord {

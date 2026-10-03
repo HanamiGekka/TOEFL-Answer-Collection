@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 
@@ -45,7 +45,7 @@ export function inspectText(text) {
 
 export function auditCurrentTree(repoRoot) {
   const tracked = execFileSync('git', ['ls-files', '--cached', '-z'], { cwd: repoRoot })
-    .toString('utf8').split('\0').filter(Boolean);
+    .toString('utf8').split('\0').filter((path) => path && existsSync(resolve(repoRoot, path)));
   const findings = [];
   for (const path of tracked) {
     const pathCategory = inspectTrackedPath(path);

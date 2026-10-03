@@ -19,7 +19,7 @@ describe('R008.5.1 English static application shell', () => {
   it('provides localized native path dialog titles', () => {
     for (const locale of ['en', 'zh-CN', 'ja', 'zh-TW']) {
       expect(i18n.t('paths.selectAppRoot', { lng: locale })).not.toBe('paths.selectAppRoot');
-      expect(i18n.t('paths.selectSourceRoot', { lng: locale })).not.toBe('paths.selectSourceRoot');
+      expect(i18n.t('paths.openFolder', { lng: locale })).not.toBe('paths.openFolder');
     }
   });
 });

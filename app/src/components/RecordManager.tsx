@@ -160,13 +160,14 @@ export function RecordManager() {
 
   async function continueRecovery(sessionId: string) {
     if (recoveringSessionId) return;
+    const displayName = records.find((record) => record.session_id === sessionId)?.package_id ?? t('records.trainingName');
     setRecoveringSessionId(sessionId);
-    setMessage(t('records.recovering', { sessionId }));
+    setMessage(t('records.recovering', { sessionId: displayName }));
     try {
       const result = await recoverSession(sessionId);
-      if (!result.ok) setMessage(t('records.cannotContinue', { sessionId, detail: result.error ?? 'RECOVERY_FAILED: no diagnostic provided.' }));
+      if (!result.ok) setMessage(t('records.cannotContinue', { sessionId: displayName, detail: result.error ?? 'RECOVERY_FAILED: no diagnostic provided.' }));
     } catch (error) {
-      setMessage(t('records.cannotContinue', { sessionId, detail: `RECOVERY_UI_FAILED: ${error instanceof Error ? error.message : String(error)}` }));
+      setMessage(t('records.cannotContinue', { sessionId: displayName, detail: `RECOVERY_UI_FAILED: ${error instanceof Error ? error.message : String(error)}` }));
     } finally {
       setRecoveringSessionId(undefined);
     }
@@ -240,16 +241,21 @@ export function RecordManager() {
           return (
             <article className="record-card" key={record.record_id}>
               <label className="record-select"><input type="checkbox" checked={selected.has(record.record_id)} onChange={(event) => setSelected((current) => {
-                const next = new Set(current); event.target.checked ? next.add(record.record_id) : next.delete(record.record_id); return next;
-              })} /><strong>{record.record_type}{record.record_type === 'TRASH' && record.original_record_type ? t('records.originalType', { type: record.original_record_type }) : ''}</strong>{record.legacy_label ? <span className="status-pill">{record.legacy_label}</span> : null}{active ? <span className="status-pill">{t('records.activeSession')}</span> : null}</label>
+                const next = new Set(current);
+                if (event.target.checked) next.add(record.record_id);
+                else next.delete(record.record_id);
+                return next;
+              })} /><strong>{record.record_type}{record.record_type === 'TRASH' && record.original_record_type ? t('records.originalType', { type: record.original_record_type }) : ''}</strong>{active ? <span className="status-pill">{t('records.activeSession')}</span> : null}</label>
               <div className="record-summary-grid">
-                <span>Session<strong>{record.session_id}</strong></span><span>Package<strong>{record.package_id ?? '—'}</strong></span>
-                <span>{t('records.date')}<strong title={record.created_at}>{formatLocalTimestamp(record.created_at)}</strong></span><span>Mode / profile<strong>{[record.mode, record.profile_id].filter(Boolean).join(' / ') || '—'}</strong></span>
-                <span>{t('records.sections')}<strong>{record.selected_sections.join(', ') || '—'}</strong></span><span>{t('records.activePause')}<strong>{formatDuration(record.active_time_ms)} / {formatDuration(record.pause_time_ms)}</strong></span>
-                <span>{t('records.status')}<strong>{record.completion_status} / {record.export_status}</strong></span><span>Schema / Structure / App<strong>{record.schema_version ?? '—'} / {record.structure_mode ?? '—'} / {record.app_version ?? '—'}</strong></span>
-                <span>{t('records.size')}<strong>{formatBytes(record.directory_size_bytes)}</strong></span><span>{t('records.relativePath')}<strong>{record.relative_path}</strong></span>
+                <span>{t('records.trainingName')}<strong>{record.package_id ?? '—'}</strong></span>
+                <span>{t('records.date')}<strong title={record.created_at}>{formatLocalTimestamp(record.created_at)}</strong></span>
+                <span>{t('records.mode')}<strong>{record.mode ? t(record.mode === 'practice' ? 'setup.practiceMode' : 'setup.examMode') : '—'}</strong></span>
+                <span>{t('records.sections')}<strong>{record.selected_sections.map((section) => t(`section.${section.toLowerCase()}`)).join(', ') || '—'}</strong></span>
+                <span>{t('records.activePause')}<strong>{formatDuration(record.active_time_ms)} / {formatDuration(record.pause_time_ms)}</strong></span>
+                <span>{t('records.status')}<strong>{t(`records.completion.${record.completion_status.toLowerCase()}`)} / {t(record.export_status === 'EXPORTED' ? 'records.exported' : 'records.exportRetryable')}</strong></span>
+                <span>{t('records.size')}<strong>{formatBytes(record.directory_size_bytes)}</strong></span>
               </div>
-              {record.section_item_counts ? <p className="muted">Created Items：{Object.entries(record.section_item_counts).map(([section, count]) => `${section} ${count}`).join(' · ')}</p> : null}
+              {record.section_item_counts ? <p className="muted">{t('records.createdItems')}: {Object.entries(record.section_item_counts).map(([section, count]) => `${t(`section.${section.toLowerCase()}`)} ${count}`).join(' · ')}</p> : null}
               {record.diagnostic && record.recovery_classification !== 'STALE_TERMINAL_RECOVERY'
                 ? <p className="danger-text">{t('records.diagnostic', { detail: record.diagnostic })}</p>
                 : null}
@@ -257,7 +263,11 @@ export function RecordManager() {
                 <p className="danger-text">{t('records.staleRecovery')}</p>
               ) : null}
               <details><summary>{t('records.viewDetails')}</summary>
-                <p>{t('records.current', { scope: `${record.current_section_id ?? '—'} / ${record.current_scope_id ?? '—'} / ${record.current_task_id ?? '—'}` })}; {t('records.lastSaved')} <span title={record.last_saved_at}>{formatLocalTimestamp(record.last_saved_at)}</span>; {t('records.needsMigration', { value: t(record.needs_migration ? 'common.yes' : 'common.no') })}</p>
+                <p>{t('records.sessionId')}: {record.session_id}</p>
+                <p>{t('records.format')}: {record.schema_version ?? '—'} / {record.structure_mode ?? '—'} / {record.app_version ?? '—'}</p>
+                <p>{t('records.profile')}: {record.profile_id ?? '—'}</p>
+                <p>{t('records.relativePath')}: {record.relative_path}</p>
+                <p>{t('records.current', { scope: `${record.current_section_id ?? '—'} / ${record.current_scope_id ?? '—'} / ${record.current_task_id ?? '—'}` })}; {t('records.lastSaved')} <span title={record.last_saved_at}>{formatLocalTimestamp(record.last_saved_at)}</span></p>
                 <ul>{record.file_names.map((name) => <li key={name}>{name}</li>)}</ul>
               </details>
               <div className="record-actions">

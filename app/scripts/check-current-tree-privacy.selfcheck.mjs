@@ -9,7 +9,7 @@ test('rejects private runtime and machine settings paths, preserving synthetic f
   assert.equal(inspectTrackedPath('records/.gitkeep'), undefined);
   assert.equal(inspectTrackedPath('data/recovery/.gitkeep'), undefined);
   assert.equal(inspectTrackedPath('app/scripts/fixtures/synthetic/events.jsonl'), undefined);
-  assert.equal(inspectTrackedPath('samples/Mock.99.Z.1/Reading/README.txt'), undefined);
+  assert.equal(inspectTrackedPath('app/scripts/fixtures/synthetic-complete-session/answers.json'), undefined);
   assert.equal(inspectTrackedPath('resources/Reading/real.pdf'), 'REVIEW_NON_SYNTHETIC_RESOURCE');
   assert.equal(inspectTrackedPath('config/private.key'), 'MACHINE_CONFIG_OR_SECRET_FILE');
 });

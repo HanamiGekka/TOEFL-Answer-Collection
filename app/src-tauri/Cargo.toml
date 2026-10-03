@@ -1,6 +1,6 @@
 [package]
 name = "toefl-answer-collection"
-version = "1.0.0"
+version = "1.0.1"
 description = "TOEFL local answer collection and typing practice"
 authors = ["Local"]
 edition = "2021"

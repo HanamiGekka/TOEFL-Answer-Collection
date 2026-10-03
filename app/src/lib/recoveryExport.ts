@@ -1,4 +1,3 @@
-import { DEFAULT_BLUEPRINT } from './blueprint';
 import { exportSessionRecord } from './exporters';
 import { prepareRecoverySession } from './recovery';
 import { loadRecoveryEvents, loadRecoverySnapshot } from './storage';
@@ -8,7 +7,7 @@ export async function exportIncompleteRecovery(sessionId: string): Promise<strin
     loadRecoverySnapshot(sessionId),
     loadRecoveryEvents(sessionId)
   ]);
-  const prepared = prepareRecoverySession(raw, [DEFAULT_BLUEPRINT.blueprint_id]);
+  const prepared = prepareRecoverySession(raw);
   if (!prepared.ok) throw new Error(`${prepared.code}: ${prepared.diagnostic}`);
   return exportSessionRecord(prepared.session, events);
 }

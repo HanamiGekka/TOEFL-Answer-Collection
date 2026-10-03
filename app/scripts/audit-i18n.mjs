@@ -43,7 +43,7 @@ else for (const locale of locales.slice(1)) {
 const sourceRoot = new URL('../src/', import.meta.url);
 const intentionalCjk = new Map([
   ['i18n/locale.ts', 'native locale names in the selector'],
-  ['lib/sessionExport.ts', 'stable legacy Markdown export contract']
+  ['lib/sessionExport.ts', 'stable v6 Markdown export contract']
 ]);
 let reviewedCjkLines = 0;
 function scanSource(directory, relative = '') {

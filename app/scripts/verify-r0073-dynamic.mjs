@@ -23,7 +23,6 @@ const fixtureRoot = join(fixtureParent, `r0073-verification-${Date.now()}-${proc
 const appRoot = join(fixtureRoot, 'app');
 const sourceRoot = join(fixtureRoot, 'source');
 const sessionId = 'r0073-generated-dynamic';
-const legacySessionId = 'r0073-legacy-v5-readable';
 const compatibilityMarker = join(fixtureRoot, '.r0063-fixture-root.json');
 const r0073Marker = join(fixtureRoot, '.r0073-disposable-root');
 const protectedPaths = [
@@ -209,7 +208,6 @@ try {
 }
 
 console.log(`IDENTITY=${sessionId}`);
-console.log(`LEGACY_IDENTITY=${legacySessionId}:READABLE`);
 console.log(`ARTIFACT_COUNT=${artifactCount < 0 ? 'UNKNOWN' : artifactCount}`);
 console.log(`CLASSIFICATION=${classification}`);
 console.log(`PATHS=APP_ROOT:${appRoot};SOURCE_ROOT:${sourceRoot};EVIDENCE_ROOT:${passed ? 'CLEANED' : fixtureRoot}`);

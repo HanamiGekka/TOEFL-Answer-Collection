@@ -1,8 +1,5 @@
-import type { PracticeSession, TimingProfile } from '../types';
-import { DEFAULT_BLUEPRINT } from './blueprint';
+import type { PracticeSession } from '../types';
 
-export type NavigationRules = TimingProfile['navigation_rules'];
-
-export function getNavigationRules(session: Pick<PracticeSession, 'mode'>): NavigationRules {
-  return DEFAULT_BLUEPRINT.navigation_profiles[session.mode];
+export function getNavigationRules(session: Pick<PracticeSession, 'mode'>) {
+  return { listening_can_return: session.mode === 'practice' };
 }

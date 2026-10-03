@@ -33,7 +33,6 @@ describe.skipIf(!process.env.R0073_VERIFY_ROOT)('R007.3 disposable dynamic verif
     let session = createDynamicSession({
       session_id: 'r0073-generated-dynamic',
       package_id: 'Mock.01.A.1',
-      source_relative_path: 'Mock.01.A.1',
       mode: 'practice',
       selected_sections: ['Reading', 'Listening', 'Writing'],
       created_at: '2026-08-03T04:00:00.000Z'
@@ -48,7 +47,7 @@ describe.skipIf(!process.env.R0073_VERIFY_ROOT)('R007.3 disposable dynamic verif
     session = upsertAnswer(session, session.questions[2], ['A', 'C'], 1300) as DynamicPracticeSession;
 
     const saved = serializeSessionForPersistence(session);
-    const continued = prepareRecoverySession(JSON.stringify(saved), []);
+    const continued = prepareRecoverySession(JSON.stringify(saved));
     expect(continued.ok).toBe(true);
     if (!continued.ok) return;
     session = continued.session as DynamicPracticeSession;
@@ -56,7 +55,7 @@ describe.skipIf(!process.env.R0073_VERIFY_ROOT)('R007.3 disposable dynamic verif
     expect(session.dynamic_sections[1]).toMatchObject({ item_ids: ['L1'], next_item_ordinal: 2 });
     expect(session.modules).toEqual([]);
     expect(session.tasks).toEqual([]);
-    expect(session.source_relative_path).toBe('Mock.01.A.1');
+    expect(session.source_relative_path).toBeUndefined();
     expect(session.source_path).toBeUndefined();
 
     session = finish(session, 'Listening');

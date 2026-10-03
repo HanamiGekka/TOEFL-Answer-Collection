@@ -1,8 +1,6 @@
-export type SectionName = 'Reading' | 'Listening' | 'Writing' | 'Speaking';
-
-export type DynamicSectionName = Exclude<SectionName, 'Speaking'>;
-
-export type SessionStructureMode = 'dynamic_manual' | 'legacy_blueprint';
+export type SectionName = 'Reading' | 'Listening' | 'Writing';
+export type DynamicSectionName = SectionName;
+export type SessionStructureMode = 'dynamic_manual';
 
 export type DynamicItemRenderer = 'single_choice' | 'multiple_choice' | 'short_text' | 'long_text';
 
@@ -35,23 +33,7 @@ export type PracticeMode = 'practice' | 'exam_simulation';
 
 export type SessionView = 'PRACTICE' | 'SESSION_SUMMARY';
 
-export type ReadingModuleId = 'READING_MODULE_1' | 'READING_MODULE_2';
-
-export type ListeningModuleId = 'LISTENING_MODULE_1' | 'LISTENING_MODULE_2';
-
-export type RuntimeScopeId =
-  | ReadingModuleId
-  | ListeningModuleId
-  /** Blueprint 1.1.0 compatibility; new Sessions use LISTENING_MODULE_1/2. */
-  | 'LISTENING_SECTION'
-  | 'WRITING_BUILD_SENTENCE'
-  | 'WRITING_EMAIL'
-  | 'WRITING_ACADEMIC_DISCUSSION'
-  | 'SPEAKING_LISTEN_REPEAT'
-  | 'SPEAKING_INTERVIEW'
-  | DynamicSectionName;
-
-export type ModuleRuntimeStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'FINALIZING' | 'FINALIZED';
+export type RuntimeScopeId = SectionName;
 
 export type QuestionProgressStatus =
   | 'NOT_ENCOUNTERED'
@@ -62,56 +44,7 @@ export type QuestionProgressStatus =
 // Kept as an alias so existing callers can migrate without losing their type name.
 export type QuestionStatus = QuestionProgressStatus;
 
-export type AnswerMode =
-  | 'single_choice'
-  | 'multiple_choice'
-  | 'text'
-  | 'short_text'
-  | 'word_blanks'
-  | 'sentence'
-  | 'long_text'
-  | 'order'
-  | 'order_input'
-  | 'speaking_timer';
-
-export type ListeningState =
-  | 'WAITING_FOR_AUDIO'
-  | 'AUDIO_PLAYING_EXTERNAL'
-  | 'WAITING_FOR_USER_MARK'
-  | 'ANSWERING'
-  | 'OVERTIME_ANSWERING'
-  | 'COMPLETED';
-
-export interface PackageSummary {
-  package_id: string;
-  /** Legacy/browser fixture compatibility. Production package scanning returns only the relative path. */
-  source_path?: string;
-  source_relative_path?: string;
-  modules: PackageModuleSummary[];
-}
-
-export interface PackageModuleSummary {
-  module_name: string;
-  file_names: string[];
-}
-
-export interface TimingProfile {
-  profile_id: string;
-  profile_version: string;
-  source_note: string;
-  created_at: string;
-  mode: PracticeMode;
-  section_rules: Record<string, unknown>;
-  task_rules: Record<string, unknown>;
-  navigation_rules: {
-    practice_can_return_to_seen_questions: boolean;
-    listening_can_return: boolean;
-    reading_modules_isolated: boolean;
-    listening_modules_isolated: boolean;
-    timeout_keeps_answer_editable: boolean;
-    show_strict_navigation_warning?: boolean;
-  };
-}
+export type AnswerMode = DynamicItemRenderer;
 
 export interface PracticeQuestion {
   id: string;
@@ -180,38 +113,13 @@ export interface DynamicPracticeItem extends PracticeQuestion {
   pause_time_ms: number;
 }
 
-export type InputControlKind =
-  | 'single_choice_buttons'
-  | 'multiple_choice_controls'
-  | 'single_line_text'
-  | 'multi_line_text'
-  | 'order_input'
-  | 'speaking_completion';
-
-export interface QuestionBlueprint {
-  blueprint_id: string;
-  blueprint_version: string;
-  sections: Record<
-    SectionName,
-    Omit<
-      PracticeQuestion,
-      | 'id'
-      | 'section'
-      | 'section_id'
-      | 'module_id'
-      | 'encountered'
-      | 'visit_count'
-      | 'first_seen_at'
-      | 'last_entered_at'
-    >[]
-  >;
-}
+export type InputControlKind = 'single_choice_buttons' | 'multiple_choice_controls' | 'single_line_text' | 'multi_line_text';
 
 export interface AnswerRecord {
   question_id: string;
   answer_value: unknown;
   progress_status: QuestionProgressStatus;
-  /** @deprecated schema v2 compatibility alias; always equals progress_status. */
+  /** Retained by the published v6 format. */
   status: QuestionProgressStatus;
   is_overtime: boolean;
   is_skipped: boolean;
@@ -220,42 +128,17 @@ export interface AnswerRecord {
   final_answer_elapsed_ms?: number | null;
   first_answer_at?: string;
   active_time_ms: number;
-  /** @deprecated schema v2 compatibility alias; always equals active_time_ms. */
+  /** Retained by the published v6 format. */
   total_active_ms: number;
   modification_count: number;
-  /** @deprecated schema v2 compatibility alias; always equals modification_count. */
+  /** Retained by the published v6 format. */
   revision_count: number;
-  /** @deprecated read-only migration alias; always equals is_uncertain. */
+  /** Retained by the published v6 format. */
   marked_review: boolean;
   last_changed_at: string;
-  /** @deprecated schema v2 compatibility alias; always equals last_changed_at. */
+  /** Retained by the published v6 format. */
   updated_at: string;
 }
-
-export interface ModuleRuntimeState {
-  id: RuntimeScopeId;
-  section: SectionName;
-  kind: 'MODULE' | 'SECTION' | 'TASK_GROUP';
-  label: string;
-  status: ModuleRuntimeStatus;
-  questionIds: string[];
-  activeTimeMs: number;
-  isOvertime: boolean;
-  startedAt: string | null;
-  finalizedAt: string | null;
-}
-
-export type TaskSectionName = 'Writing' | 'Speaking';
-
-export type TaskRuntimeStatus =
-  | 'NOT_STARTED'
-  | 'ACTIVE'
-  | 'PAUSED'
-  | 'COMPLETED'
-  | 'NEEDS_RETRY'
-  | 'OVERTIME';
-
-export type SpeakingTaskOutcome = 'COMPLETED' | 'NEEDS_RETRY';
 
 export type WritingInputType =
   | 'insertText'
@@ -269,87 +152,26 @@ export type WritingInputType =
   | 'historyRedo'
   | string;
 
-export interface PracticeTaskRun {
-  task_id: string;
-  section_id: TaskSectionName;
-  task_type: string;
-  status: TaskRuntimeStatus;
-  active_time_ms: number;
-  pause_time_ms: number;
-  timer_limit_ms: number | null;
-  remaining_ms: number | null;
-  started_at: string | null;
-  completed_at: string | null;
-  attempt_count: number;
-  is_overtime: boolean;
-  overtime_event_recorded?: boolean;
-  needs_retry: boolean;
-  question_ids: string[];
-  text?: string;
-  word_count?: number;
-  character_count?: number;
-  keyboard_cpm?: number;
-  keyboard_inserted_characters?: number;
-  pasted_characters?: number;
-  deleted_characters?: number;
-  cut_count?: number;
-  paste_count?: number;
-  undo_count?: number;
-  redo_count?: number;
-  modification_count?: number;
-  undo_stack?: string[];
-  redo_stack?: string[];
-}
-
-export type PersistedTaskRuntime = PracticeTaskRun;
-
-export type FinalizeScopeResult =
-  | {
-      ok: true;
-      next: 'NEXT_MODULE' | 'NEXT_SECTION' | 'SESSION_SUMMARY';
-      finalizedScopeId: RuntimeScopeId;
-      session: PracticeSession;
-    }
-  | {
-      ok: false;
-      reason: 'UNENCOUNTERED_ITEMS';
-      questionIds: string[];
-      session: PracticeSession;
-    }
-  | {
-      ok: false;
-      reason: 'PERSISTENCE_ERROR';
-      message: string;
-      session: PracticeSession;
-    };
-
-export type FinalizeModuleResult = FinalizeScopeResult;
-
 export interface SessionNotice {
   kind: 'info' | 'warning' | 'error';
   message: string;
   messageKey?: string;
   messageValues?: Record<string, string | number>;
   questionIds?: string[];
-  taskIds?: string[];
   retryAction?:
-    | 'FINALIZE_SCOPE'
     | 'EXPORT_SESSION'
     | 'CLEANUP_TERMINAL_RECOVERY'
-    | 'CONFIRM_SPEAKING_RETRIES'
     | 'CONFIRM_DYNAMIC_SECTION';
 }
 
 export interface PracticeSession {
   session_schema_version: number;
   structure_mode?: SessionStructureMode;
-  blueprint_id?: string;
-  blueprint_version?: string;
-  blueprint_override_package_id?: string;
   session_id: string;
   package_id: string;
-  /** Legacy v2-v5 source metadata. New schema v6 Sessions use source_relative_path. */
+  /** source_path is invalid v6 input; retained here only for validation. */
   source_path?: string;
+  /** Optional safe metadata retained by published v1.0.0 v6 records. */
   source_relative_path?: string;
   mode: PracticeMode;
   timing_profile_id: string;
@@ -373,19 +195,19 @@ export interface PracticeSession {
   active_section_question_ids: string[];
   all_session_question_ids: string[];
 
-  /** @deprecated schema v2 compatibility alias; always equals current_section_id. */
+  /** Retained by the published v6 format. */
   current_section: SectionName;
-  /** @deprecated index compatibility; current_question_id is authoritative. */
+  /** Retained by the published v6 format. */
   current_question_index: number;
 
   questions: PracticeQuestion[];
   answers: Record<string, AnswerRecord>;
-  modules: ModuleRuntimeState[];
-  tasks: PracticeTaskRun[];
+  /** Empty collections retained by the published v6 format. */
+  modules: never[];
+  tasks: never[];
   dynamic_sections?: DynamicSectionRuntime[];
   item_type_registry?: DynamicItemTypeConfig[];
   view: SessionView;
-  last_finalize_error?: FinalizeScopeResult;
 }
 
 export interface QuestionNavItem {

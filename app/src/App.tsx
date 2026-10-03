@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GlobalShortcutController } from './components/GlobalShortcutController';
-import { PackagePicker } from './components/PackagePicker';
 import { PathSettings } from './components/PathSettings';
 import { PracticeSetup } from './components/PracticeSetup';
 import { PracticeShell } from './components/PracticeShell';
@@ -192,7 +191,7 @@ export default function App() {
             <>
               <RecoveryPanel />
               <div className="home-grid">
-                <section className="card"><h2>{t('app.newPractice')}</h2><PackagePicker /><PracticeSetup /></section>
+                <section className="card"><h2>{t('app.newPractice')}</h2><PracticeSetup /></section>
                 <TypingPractice />
               </div>
             </>
@@ -251,7 +250,7 @@ async function persistForWindowClose(): Promise<void> {
 async function waitForCurrentStoreSave(): Promise<void> {
   const isBusy = () => {
     const state = useAppStore.getState();
-    return state.saveStatus === 'saving' || state.speakingTransitionPending;
+    return state.saveStatus === 'saving' || state.batchPending;
   };
   if (!isBusy()) return;
 

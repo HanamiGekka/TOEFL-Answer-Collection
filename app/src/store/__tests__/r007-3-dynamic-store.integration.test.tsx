@@ -18,11 +18,9 @@ import {
   saveSessionSnapshot,
   saveAppSetting
 } from '../../lib/storage';
-import type { PackageSummary } from '../../types';
 import { useAppStore } from '../appStore';
 
 vi.mock('../../lib/storage', () => ({
-  scanPackages: vi.fn(async () => []),
   appendEvent: vi.fn(async () => undefined),
   cleanupTerminalRecovery: vi.fn(async () => 0),
   saveSessionSnapshot: vi.fn(async () => undefined),
@@ -35,20 +33,17 @@ vi.mock('../../lib/storage', () => ({
   openSessionExportDirectory: vi.fn(async () => undefined)
 }));
 
-const packageSummary: PackageSummary = {
+const packageSummary = {
   package_id: '01.21.A.1',
-  source_path: 'readonly',
+  source_relative_path: 'readonly',
   modules: []
 };
 
 function resetStore() {
   useAppStore.setState({
-    packages: [packageSummary],
-    selectedPackage: packageSummary,
+    trainingName: packageSummary.package_id,
     selectedSections: ['Reading', 'Listening', 'Writing'],
     mode: 'practice',
-    blueprintStatus: 'error',
-    blueprintErrors: ['legacy blueprint intentionally unavailable'],
     session: undefined,
     events: [],
     eventSeq: 0,
@@ -57,8 +52,6 @@ function resetStore() {
     pausedMs: 0,
     questionActiveMs: 0,
     scopeActiveMs: 0,
-    taskActiveMs: 0,
-    taskRemainingMs: null,
     isPaused: false,
     sessionNotice: undefined,
     dynamicItemDialog: undefined,
@@ -435,7 +428,7 @@ describe('R007.3 dynamic Store and UI entry', () => {
     const edited = useAppStore.getState().session!;
     expect(edited.questions[0].type_label).toBe('New synthetic label');
     expect(edited.questions[0].type_id).not.toBe(session.questions[0].type_id);
-    expect(prepareRecoverySession(JSON.stringify(serializeSessionForPersistence(edited)), []).ok).toBe(true);
+    expect(prepareRecoverySession(JSON.stringify(serializeSessionForPersistence(edited))).ok).toBe(true);
   });
 
   it('R008.1 edits a system preset without changing its stable ID', () => {
@@ -505,7 +498,7 @@ describe('R007.3 dynamic Store and UI entry', () => {
     const initial = createDynamicSession({
       session_id: 'r0073-store-recovery',
       package_id: packageSummary.package_id,
-      source_path: packageSummary.source_path,
+      source_relative_path: packageSummary.source_relative_path,
       mode: 'practice',
       selected_sections: ['Reading'],
       created_at: '2026-08-03T03:00:00.000Z'
@@ -537,7 +530,7 @@ describe('R007.3 dynamic Store and UI entry', () => {
   it('emits one custom-limit overtime event without advancing or overwriting answer flags', () => {
     const initial = createDynamicSession({
       session_id: 'r0073-overtime', package_id: packageSummary.package_id,
-      source_path: packageSummary.source_path, mode: 'practice', selected_sections: ['Reading']
+      source_relative_path: packageSummary.source_relative_path, mode: 'practice', selected_sections: ['Reading']
     });
     const limited = createDynamicItem(initial, 'Reading', createCustomItemType({
       section: 'Reading', type_label: 'One second', renderer: 'single_choice',
@@ -574,7 +567,7 @@ describe('R007.3 dynamic Store and UI entry', () => {
   it('attributes pause time to the current dynamic Item and Section without increasing active time', () => {
     const initial = createDynamicSession({
       session_id: 'r0073-pause', package_id: packageSummary.package_id,
-      source_path: packageSummary.source_path, mode: 'practice', selected_sections: ['Reading']
+      source_relative_path: packageSummary.source_relative_path, mode: 'practice', selected_sections: ['Reading']
     });
     const session = createDynamicItem(
       initial, 'Reading', getItemTypePreset('Reading', 'reading_short_text')

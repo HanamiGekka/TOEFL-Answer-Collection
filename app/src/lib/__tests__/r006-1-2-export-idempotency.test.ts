@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PracticeSession } from '../../types';
-import { DEFAULT_BLUEPRINT } from '../blueprint';
 import { exportSessionRecord } from '../exporters';
-import { buildInitialSessionRuntime, createDefaultQuestions } from '../sessionEngine';
+import { createDynamicSession } from '../dynamicSession';
 import { buildSessionExportDirectory } from '../sessionExport';
 import type { LocalRecordSummary } from '../recordManager';
 
@@ -23,24 +22,7 @@ vi.mock('../storage', () => ({
 }));
 
 function session(): PracticeSession {
-  return buildInitialSessionRuntime({
-    session_schema_version: 5,
-    session_id: 'synthetic-idempotent-session',
-    package_id: 'Synthetic.01.A.1',
-    source_path: 'readonly-synthetic',
-    mode: 'practice',
-    timing_profile_id: 'toefl-2026-practice',
-    timing_profile_version: '1.0.0',
-    blueprint_id: DEFAULT_BLUEPRINT.blueprint_id,
-    blueprint_version: DEFAULT_BLUEPRINT.version,
-    created_at: '2026-07-19T01:00:00.000Z',
-    active_ms: 0,
-    paused_ms: 0,
-    questions: createDefaultQuestions(['Reading']),
-    answers: {},
-    modules: [],
-    view: 'PRACTICE'
-  });
+  return createDynamicSession({ session_id: 'synthetic-idempotent-session', package_id: 'Synthetic.01.A.1', mode: 'practice', selected_sections: ['Reading'], created_at: '2026-07-19T01:00:00.000Z' });
 }
 
 beforeEach(() => vi.clearAllMocks());

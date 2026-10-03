@@ -2,9 +2,31 @@
 
 User-visible changes. R numbers identify development rounds within a release.
 
+## 1.0.1 — 2026-10-03
+
+Small usability and cleanup maintenance release.
+
+### Changed
+
+- Start practice directly from a Training name without materials-folder setup.
+- Storage settings show one Data folder; shortcuts show friendly names and bindings.
+- Record cards show useful summaries with technical metadata behind collapsed details.
+- English, Simplified Chinese, Japanese and Traditional Chinese remain available.
+
+### Removed
+
+- Obsolete Speaking runtime/UI, pre-v6 readers/migration and source-package scanner/sample flow.
+
+### Compatibility
+
+- Official v1.0.0 dynamic v6 Sessions, optional safe source metadata, Recovery/index/export remain supported.
+- Session schema remains v6; SQLite schema is unchanged.
+
 ## 1.0.0 — 2026-09-29
 
 First public release for Windows 10/11 x64. The current-user NSIS installer is unsigned, so Windows SmartScreen may warn. The tool records Reading, Listening, and Writing answers; supports batch creation, reusable templates, Recovery, local export, and blind Typing; and offers four interface languages. Real study materials stay external. This independent project is not affiliated with ETS and includes no official TOEFL questions, audio, or answer keys.
+
+The [public v1.0.0 release](https://github.com/HanamiGekka/TOEFL-Answer-Collection/releases/tag/v1.0.0) contains the Windows installer and its SHA-256 checksum. Public source begins at clean commit `f265fa161d541dbc5e503e01f48e908ed933e064`; historical development commits remain private.
 
 ### R008.7.1 — Release candidate hardening
 

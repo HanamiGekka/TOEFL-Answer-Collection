@@ -8,7 +8,7 @@ Theme name: `TOEFL Reference Light Theme`.
 
 This theme follows visual patterns in read-only `Demand/` references: a white workspace, deep-teal navigation, teal actions, dark body text, and gray separators. All values are local approximations, not an official ETS theme or palette. The app does not copy prompts, images, options, or answers from the references.
 
-The theme changes presentation only. It does not change Blueprint, schema, Store, timing, Recovery, export, shortcuts, or Rust path behavior.
+The theme changes presentation only. It does not change item configuration, schema, Store, timing, Recovery, export, shortcuts, or Rust path behavior.
 
 ## Single source
 
