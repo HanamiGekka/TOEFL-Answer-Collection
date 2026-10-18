@@ -6,51 +6,43 @@ Language / 语言 / 言語 / 語言: [English](#english) → [简体中文](#sim
 
 ## English
 
-TOEFL Answer Collection is a local-first Windows/Tauri tool for recording TOEFL answers and practicing English blind typing alongside study materials kept outside the app. The [public source](https://github.com/HanamiGekka/TOEFL-Answer-Collection) and [Windows v1.0.1 release](https://github.com/HanamiGekka/TOEFL-Answer-Collection/releases/tag/v1.0.1) are available.
+A **local-first Windows app** for recording TOEFL practice answers, timing sessions and practicing English blind typing. Keep your study materials outside the app and record your work alongside them. **No official TOEFL questions, audio or answer keys are included.**
 
+![TOEFL Answer Collection v1.0.1: training setup and blind typing with synthetic demo text](docs/images/home-and-typing-v1.0.1.jpg)
 
-For normal use on Windows 10/11 x64, run the current-user NSIS installer and launch TOEFL Answer Collection from the Start Menu. The installed application does not need Node.js, npm, Rust, Cargo, Git, Visual Studio Build Tools, or Python. Microsoft Edge WebView2 is the Windows runtime prerequisite; supported Windows installations normally have it, and the installer may bootstrap it when missing. The unsigned installer may trigger a SmartScreen warning.
+*Actual v1.0.1 Windows app, captured in isolated test-data mode with synthetic text. The test banner is intentionally visible; no personal records or official materials appear. [Screenshot details](docs/product/SCREENSHOTS.md).*
+
+### Quick start
+
+1. Download the **v1.0.1 Windows installer** from [Releases](https://github.com/HanamiGekka/TOEFL-Answer-Collection/releases/tag/v1.0.1), install for the current Windows account and open it from the Start menu.
+2. On the Practice page, enter a **Training name**, choose Reading, Listening or Writing, then select **Start practice**. Add items individually or in batches; no materials folder is required.
+3. For typing, use **Blind typing practice → Start** on the same page. Pause or end the practice as needed; drafts and exports stay local.
+4. Open **Record Manager** to review saved records, or **Settings → Data folder** to locate or select the storage folder.
+
+**Requirements:** Windows 10/11 x64 and Microsoft Edge **WebView2**. The installer may bootstrap WebView2 if it is missing. The installer is **unsigned**, so SmartScreen may show a warning. Running the installed app does not require Node.js, Rust or other development tools.
 
 ### Current features
 
-- New sessions use dynamic schema v6. In Reading, Listening, and Writing, users can create single-choice, multiple-choice, short-text, and long-text items one at a time, with custom labels, option labels, and optional time limits.
-- Batch creation supports 1–100 items. Built-in batches are Reading Fill in the Blank ×10, Academic Reading single-choice ×5, Academic Lecture single-choice ×4, and Writing Build a Sentence ×10. Reusable templates with multiple blocks per section can be saved, reloaded, updated, deleted, and applied repeatedly. Templates live in local settings under the current Data folder.
-- Sessions support navigation, pausing, timing, status marks, reopening sections, a summary, recovery of incomplete sessions, and several local export formats.
-- A separate Typing mode supports English blind typing, drafts, metrics, and export. The local Record Manager manages records and Trash.
-- Official v1.0.0 dynamic v6 records remain readable. Pre-v6 records are unsupported; obsolete Speaking runtime has been removed. Shortcut settings show friendly names, and record cards keep technical metadata in expandable details.
-- The app does not read or store real question content, audio, or answer keys. It has no network access or telemetry.
-- The interface supports English, Simplified Chinese, Japanese, and Traditional Chinese; fresh use starts in English, and a saved language choice persists.
-
-### Local development
-
-Use Node 24.18.0 from [`app/.nvmrc`](app/.nvmrc); `package.json` accepts compatible versions in the same 24 series. Rust is pinned to 1.96.1 by `app/src-tauri/rust-toolchain.toml`. After installing the Windows prerequisites for Tauri, use the lockfile in `app/`:
-
-```powershell
-npm ci
-npm run audit:privacy
-npm run audit:i18n
-npm run audit:public-release
-npm run typecheck
-npm run lint
-npm run test
-npm run build
-npm run e2e
-npm run tauri:dev
-```
-
-Run `cargo fmt --check`, `cargo check --locked`, `cargo test --locked`, and `cargo audit` in `app/src-tauri/`. On Windows, `npm run tauri:build` produces the current-user NSIS setup executable. The release is unsigned. See the [architecture](docs/product/ARCHITECTURE.md) for runtime structure. Use `npm install` only when maintaining dependencies and updating `package.json` / `package-lock.json`, then verify with `npm ci`. The public repository runs Ubuntu frontend and Windows native/packaging CI.
+- Reading, Listening and Writing answer records under **dynamic schema v6**, with single-choice, multiple-choice, short-text and long-text items, custom labels and optional time limits.
+- Batch creation of **1–100 items**, built-in batch presets and reusable multi-block templates for each section. Templates stay in the current Data folder's local settings.
+- Timing, pause/resume, status marks, navigation, section reopening, summaries, recovery of incomplete sessions and several local export formats.
+- Separate English blind typing with drafts, statistics and exports; a local Record Manager and Trash.
+- English, Simplified Chinese, Japanese and Traditional Chinese UI. Fresh use starts in English; the saved language choice persists.
+- Official **v1.0.0 dynamic v6 records remain readable**. Pre-v6 records are unsupported. Speaking is not part of the current runtime.
 
 ### Data safety
 
-To start, install the app, enter a Training name, select Reading, Listening, or Writing, and choose Start practice. No external files or materials folder are required. The app does not need to know where separately used study materials are stored.
+The **Data folder** defaults to the operating system's per-account application data directory. Records, Recovery, SQLite, logs and exports stay there; application settings stay in the per-account configuration directory. Selecting another Data folder **does not move old records automatically**. Select the previous folder again to view its records.
 
-The Data folder defaults to the operating system's per-user application data directory. Settings can choose another Data folder and open the current one. User records, Recovery, SQLite, logs, and exports stay under that folder; settings stay in the per-user configuration directory. Changing the Data folder does not move old records automatically. To view them, select the previous folder in Settings. Delete formal records through the in-app Record Manager. See [engineering rules](AGENTS.md) and [privacy and safety](docs/product/PRIVACY_AND_SAFETY.md).
+The app has no network access or telemetry. Use Record Manager for formal-record deletion and review exports before sharing them. Public source excludes personal answers, real practice records, Recovery, databases, local settings, external study materials and private development history. See [privacy and safety](docs/product/PRIVACY_AND_SAFETY.md).
 
-The public source excludes real materials, user records, Recovery, SQLite, local settings, exports, and private development history.
+### Local development
+
+Build from source with **Node.js 24.18.0** (compatible 24.x accepted) and **Rust 1.96.1**, plus the Windows Tauri prerequisites. The [development and build guide](docs/development/BUILD.md) contains installation, audit, test and packaging commands. See [architecture](docs/product/ARCHITECTURE.md) for runtime structure. The repository CI checks Ubuntu frontend and Windows native/packaging behavior.
 
 ### License and independence
 
-Project-authored source and documentation are offered under the [MIT License](LICENSE); third-party dependencies keep their own licenses. This is an independent study tool and is not affiliated with or endorsed by ETS. This repository does not distribute official TOEFL questions, audio, or answer keys. Real study materials remain outside the repository.
+Project-authored source and documentation use the [MIT License](LICENSE); dependencies retain their own licenses. This independent study tool is **not affiliated with or endorsed by ETS** and does not distribute official TOEFL questions, audio or answer keys.
 
 ### Documentation
 
@@ -62,51 +54,39 @@ Project-authored source and documentation are offered under the [MIT License](LI
 
 ## 简体中文
 
-TOEFL Answer Collection 是基于 Windows/Tauri、以本地为主的 TOEFL 答案记录与英文盲打工具，配合应用外的学习资料使用。[公开源码](https://github.com/HanamiGekka/TOEFL-Answer-Collection)和 [Windows v1.0.1 正式版](https://github.com/HanamiGekka/TOEFL-Answer-Collection/releases/tag/v1.0.1)现已提供。
+TOEFL Answer Collection 是**以本地为主的 Windows 答案记录与英文盲打工具**，用于记录 TOEFL 练习答案、计时和复习。学习资料在应用外自行使用；**程序不包含官方题目、音频或标准答案**。
 
+### 快速开始
 
-在 Windows 10/11 x64 上正常使用时，运行当前用户模式的 NSIS 安装程序，然后从开始菜单启动 TOEFL Answer Collection。用户无需安装 Node.js、npm、Rust、Cargo、Git、Visual Studio Build Tools 或 Python。Windows 运行时需要 Microsoft Edge WebView2；受支持的系统通常已安装，缺少时安装程序可能会引导安装。未签名的安装程序可能触发 SmartScreen 提示。
+1. 从 [Release 下载 v1.0.1 Windows 安装包](https://github.com/HanamiGekka/TOEFL-Answer-Collection/releases/tag/v1.0.1)，按当前 Windows 账户安装，再从开始菜单启动。
+2. 在练习页输入**训练名称**，选择 Reading／Listening／Writing，点击“开始练习”，随后逐题或批量建题，无需选择教材目录。
+3. 英文盲打在同页的盲打练习区开始，可暂停或结束；草稿和导出保存在本地。
+4. 在 Record Manager 查看已保存记录，在设置的**数据文件夹**中查看或选择存储位置。
+
+**运行要求：**Windows 10/11 x64 和 Microsoft Edge **WebView2**；缺少 WebView2 时安装程序可能引导安装。安装包**未签名**，可能出现 SmartScreen 提示。运行正式应用无需 Node.js、Rust 等开发工具。[上方展示图](#english)来自隔离测试环境，仅含合成文字。
 
 ### 当前功能
 
-- 新 Session 使用动态 schema v6。在 Reading、Listening、Writing 中，可逐题创建单选、多选、短文本和长文本 Item，支持自定义标签、选项标签和可选时限。
-- 批量建题支持 1–100 题。内置批次为 Reading 填词 ×10、Academic Reading 单选 ×5、Academic Lecture 单选 ×4、Writing Build a Sentence ×10。每个 Section 的多 block 可复用模板可保存、重载、更新、删除和重复应用，保存在当前数据文件夹的本地设置中。
-- Session 支持导航、暂停、计时、状态标记、Section 重开、Summary、未完成 Session 恢复和多格式本地导出。
-- 独立 Typing 模式支持英文盲打、草稿、统计与导出。本地 Record Manager 管理记录和 Trash。
-- 正式 v1.0.0 的动态 v6 记录仍可读取；不再支持 v6 之前的记录，旧 Speaking 运行代码已移除。快捷键设置显示易读名称，记录卡片的技术信息可按需展开。
-- 应用不读取或存储真实题目、音频或标准答案；无联网功能或遥测。
-- 界面支持英语、简体中文、日语和繁体中文；首次使用默认英语，已保存的语言选择会保留。
-
-### 本地开发
-
-Node 使用 [`app/.nvmrc`](app/.nvmrc) 中的 24.18.0；`package.json` 接受同一 24 系列兼容版本。Rust 由 `app/src-tauri/rust-toolchain.toml` 固定为 1.96.1。安装 Tauri 所需的 Windows 组件后，在 `app/` 使用锁文件：
-
-```powershell
-npm ci
-npm run audit:privacy
-npm run audit:i18n
-npm run audit:public-release
-npm run typecheck
-npm run lint
-npm run test
-npm run build
-npm run e2e
-npm run tauri:dev
-```
-
-在 `app/src-tauri/` 执行 `cargo fmt --check`、`cargo check --locked`、`cargo test --locked` 和 `cargo audit`。在 Windows 上，`npm run tauri:build` 生成当前用户模式的 NSIS 安装程序；正式版尚未签名。运行结构见[架构](docs/product/ARCHITECTURE.md)。仅维护依赖时使用 `npm install` 更新 `package.json` / `package-lock.json`，随后以 `npm ci` 复验。公开仓库设有 Ubuntu 前端及 Windows native/打包 CI。
+- Reading、Listening、Writing 使用**动态 schema v6** 记录答案，可创建单选、多选、短文本、长文本题目，并设置自定义标签和可选时限。
+- 支持 **1–100 题**批量创建、内置批次及各部分的多块可复用模板；模板保存在当前数据文件夹的本地设置中。
+- 支持计时、暂停与继续、状态标记、题目导航、重新打开部分、结果汇总、未完成会话恢复和多格式本地导出。
+- 独立英文盲打提供草稿、统计和导出；Record Manager 与回收站管理本地记录。
+- 界面支持英语、简体中文、日语和繁体中文，首次默认英语，后续保留已保存的语言选择。
+- 正式 **v1.0.0 动态 v6 记录仍可读取**；不支持 v6 之前的记录，当前程序不提供 Speaking。
 
 ### 数据安全
 
-安装应用后，输入训练名称、选择 Reading／Listening／Writing，再点击“开始练习”即可，无需准备外部文件或资料目录。应用不需要知道另外使用的学习资料存放在哪里。
+**数据文件夹**默认位于当前账户的应用数据目录。记录、Recovery、SQLite、日志与导出保存在这里，应用设置另存于账户的配置目录。**更换数据文件夹不会自动迁移旧记录**；需要查看旧记录时，重新选择原文件夹。
 
-数据文件夹默认位于当前用户的应用数据目录，设置中可选择其他文件夹或打开当前文件夹。用户记录、Recovery、SQLite、日志和导出保存在数据文件夹下；设置保存在当前用户的应用配置目录。更换数据文件夹不会自动迁移旧记录，如需查看旧记录，请在设置中选择原文件夹。正式记录请通过应用内 Record Manager 删除。详见[工程规则](AGENTS.md)与[隐私和安全](docs/product/PRIVACY_AND_SAFETY.md)。
+应用无联网功能或遥测。正式记录通过 Record Manager 删除，导出分享前请检查内容。公开源码不含个人答案、真实练习记录、Recovery、数据库、本机设置、外部学习资料或私有开发历史。详见[隐私和安全](docs/product/PRIVACY_AND_SAFETY.md)。
 
-公开源码不包含真实资料、用户记录、Recovery、SQLite、本机设置、导出和私人开发历史。
+### 本地开发
+
+源码构建使用 **Node.js 24.18.0**（接受兼容的 24.x）和 **Rust 1.96.1**，并需准备 Windows Tauri 组件。[开发与构建指南](docs/development/BUILD.md)集中说明安装、审计、测试和打包命令；运行结构见[架构](docs/product/ARCHITECTURE.md)。仓库 CI 检查 Ubuntu 前端和 Windows 原生／打包行为。
 
 ### 许可与独立性
 
-项目原创源码及文档采用 [MIT 许可证](LICENSE)；第三方依赖保留各自的许可证。本项目是独立学习工具，与 ETS 无关联，也未获其认可。仓库不分发官方 TOEFL 题目、音频或答案；真实学习资料保留在仓库外。
+项目原创源码及文档采用 [MIT 许可证](LICENSE)，依赖保留各自条款。本项目是独立学习工具，**与 ETS 无关联，也未获其认可**；不分发官方 TOEFL 题目、音频或答案。
 
 ### 文档
 
@@ -118,51 +98,39 @@ npm run tauri:dev
 
 ## 日本語
 
-TOEFL Answer Collection は、アプリの外に置いた学習資料と併用する、Windows/Tauri 製のローカル優先 TOEFL 解答記録・英語ブラインドタイピングツールです。[公開ソース](https://github.com/HanamiGekka/TOEFL-Answer-Collection)と [Windows v1.0.1 リリース](https://github.com/HanamiGekka/TOEFL-Answer-Collection/releases/tag/v1.0.1)を利用できます。
+TOEFL Answer Collection は、TOEFL の練習解答、計時、英語のタッチタイピングを扱う、**ローカル優先の Windows アプリ**です。教材はアプリの外で参照しながら使います。**公式 TOEFL の問題、音声、正解は収録していません。**
 
+### はじめに
 
-Windows 10/11 x64 で通常使用する場合は、現在のユーザー向け NSIS インストーラーを実行し、スタートメニューから TOEFL Answer Collection を起動します。利用者は Node.js、npm、Rust、Cargo、Git、Visual Studio Build Tools、Python をインストールする必要はありません。Windows の実行には Microsoft Edge WebView2 が必要です。対応する Windows には通常含まれ、ない場合はインストーラーが導入を支援することがあります。未署名のインストーラーには SmartScreen の警告が表示される場合があります。
+1. [Release から v1.0.1 の Windows インストーラー](https://github.com/HanamiGekka/TOEFL-Answer-Collection/releases/tag/v1.0.1)を取得し、現在の Windows アカウントにインストールしてスタートメニューから起動します。
+2. 練習画面で**練習名**を入力し、Reading／Listening／Writing を選んで練習を開始します。設問は個別または一括で作成でき、教材フォルダーの指定は不要です。
+3. 英語のタッチタイピングは、同じ画面のタイピング練習欄で開始します。一時停止や終了ができ、下書きと書き出しはローカルに保存されます。
+4. 保存済みの記録は Record Manager、保存先の確認・変更は設定の**データフォルダー**から行います。
+
+**動作環境：**Windows 10/11 x64 と Microsoft Edge **WebView2**。WebView2 がない場合は、インストーラーが導入を支援することがあります。配布物は**未署名**で、SmartScreen の警告が表示される場合があります。インストール済みアプリの利用に Node.js や Rust は不要です。[上の画面例](#english)は独立したテスト環境で撮影し、架空の文章だけを使っています。
 
 ### 現在の機能
 
-- 新しい Session は動的 schema v6 を使用します。Reading、Listening、Writing では、単一選択、複数選択、短文、長文の Item を 1 問ずつ作成でき、独自のラベル、選択肢ラベル、任意の制限時間を設定できます。
-- 一括作成では 1～100 問を作れます。標準の一括設定は Reading の穴埋め ×10、Academic Reading の単一選択 ×5、Academic Lecture の単一選択 ×4、Writing Build a Sentence ×10 です。Section ごとに複数 block を含む再利用可能なテンプレートを保存、再読込、更新、削除、繰り返し適用できます。テンプレートは現在のデータフォルダーのローカル設定に保存されます。
-- Session には問題移動、一時停止、計時、状態の記録、Section の再開、Summary、未完了 Session の復元、複数形式でのローカル書き出しがあります。
-- 独立した Typing モードでは、英語のブラインドタイピング、下書き、統計、書き出しを利用できます。ローカルの Record Manager で記録と Trash を管理します。
-- 正式版 v1.0.0 を含む動的 v6 記録を引き続き読み込めます。v6 より前の記録は非対応となり、従来の Speaking 処理は削除されました。ショートカットは分かりやすい名前で表示し、記録の技術情報は必要に応じて展開できます。
-- アプリは実際の問題文、音声、正解を読み込んだり保存したりしません。ネットワーク通信やテレメトリーはありません。
-- UI は英語、簡体字中国語、日本語、繁体字中国語に対応します。初回は英語で始まり、保存した言語設定は維持されます。
-
-### ローカル開発
-
-Node は [`app/.nvmrc`](app/.nvmrc) の 24.18.0 を使用します。`package.json` は同じ 24 系列の互換バージョンを受け付けます。Rust は `app/src-tauri/rust-toolchain.toml` で 1.96.1 に固定されています。Windows 用 Tauri の前提コンポーネントを導入した後、`app/` でロックファイルを使います。
-
-```powershell
-npm ci
-npm run audit:privacy
-npm run audit:i18n
-npm run audit:public-release
-npm run typecheck
-npm run lint
-npm run test
-npm run build
-npm run e2e
-npm run tauri:dev
-```
-
-`app/src-tauri/` では `cargo fmt --check`、`cargo check --locked`、`cargo test --locked`、`cargo audit` を実行します。Windows では `npm run tauri:build` で現在のユーザー向け NSIS インストーラーを生成します。公開版には署名がありません。構成は[アーキテクチャ](docs/product/ARCHITECTURE.md)を参照してください。依存関係を保守するときに限り `npm install` で `package.json` / `package-lock.json` を更新し、その後 `npm ci` で確認します。公開リポジトリでは Ubuntu frontend と Windows native／パッケージングの CI が実行されます。
+- Reading、Listening、Writing の解答を**動的 schema v6** で記録。単一選択、複数選択、短文、長文の設問を作成し、ラベルや任意の制限時間を設定できます。
+- **1～100 問**の一括作成、標準の一括設定、セクションごとの複数ブロックを含む再利用可能なテンプレート。テンプレートは現在のデータフォルダーのローカル設定に保存します。
+- 計時、一時停止・再開、状態の記録、設問移動、セクションの再開、結果一覧、未完了セッションの復元、複数形式の書き出し。
+- 英語タイピングの下書き、統計、書き出しと、Record Manager／ごみ箱によるローカル記録の管理。
+- 英語、簡体字中国語、日本語、繁体字中国語の UI。初回は英語で、保存した言語設定を維持します。
+- 正式版 **v1.0.0 の動的 v6 記録は引き続き読み込めます**。v6 より前の記録は非対応で、現行版に Speaking はありません。
 
 ### データの安全性
 
-アプリをインストールし、練習名を入力して Reading／Listening／Writing を選び、「練習を開始」を押します。外部ファイルや教材フォルダーの準備は不要です。別に使う学習教材の保存先をアプリに知らせる必要はありません。
+**データフォルダー**の既定値は、現在のアカウントのアプリデータ領域です。記録、Recovery、SQLite、ログ、書き出しはその中に、アプリ設定はアカウントの設定領域に保存します。**保存先を変更しても、古い記録は自動移行されません。** 過去の記録を見るには以前のフォルダーを選び直します。
 
-データフォルダーの既定値は現在のユーザーのアプリデータ領域です。設定で別のフォルダーを選択したり、現在のフォルダーを開いたりできます。記録、Recovery、SQLite、ログ、書き出しはそのフォルダー内に保存され、設定はユーザーのアプリ設定フォルダーに保存されます。データフォルダーの変更では古い記録は自動移行されません。必要なら設定で以前のフォルダーを選びます。正式な記録の削除にはアプリ内の Record Manager を使ってください。[開発ルール](AGENTS.md)と[プライバシーと安全性](docs/product/PRIVACY_AND_SAFETY.md)も参照してください。
+アプリにネットワーク通信やテレメトリーはありません。正式な記録の削除は Record Manager から行い、書き出しを共有する前に内容を確認してください。公開ソースには個人の解答、実際の練習記録、Recovery、データベース、ローカル設定、教材、非公開の開発履歴を含めません。[プライバシーと安全性](docs/product/PRIVACY_AND_SAFETY.md)も参照してください。
 
-公開ソースには、実際の教材、ユーザー記録、Recovery、SQLite、ローカル設定、書き出し、非公開の開発履歴を含めません。
+### ローカル開発
+
+ソースからのビルドには **Node.js 24.18.0**（互換 24.x 可）、**Rust 1.96.1**、Windows 用 Tauri の前提コンポーネントが必要です。導入、監査、試験、パッケージ作成のコマンドは[開発・ビルドガイド](docs/development/BUILD.md)、構成は[アーキテクチャ](docs/product/ARCHITECTURE.md)にまとめています。CI は Ubuntu フロントエンドと Windows ネイティブ／パッケージングを検査します。
 
 ### ライセンスと独立性
 
-本プロジェクトが作成したソースと文書は [MIT ライセンス](LICENSE)で提供します。第三者の依存関係にはそれぞれのライセンスが適用されます。本プロジェクトは独立した学習ツールであり、ETS との提携や ETS による承認はありません。公式 TOEFL の問題、音声、解答は配布しません。実際の学習教材はリポジトリの外に置きます。
+プロジェクト独自のソースと文書は [MIT ライセンス](LICENSE)で提供し、依存関係にはそれぞれの条件が適用されます。独立した学習ツールであり、**ETS との提携や ETS による承認はありません**。公式 TOEFL の問題、音声、解答は配布しません。
 
 ### ドキュメント
 
@@ -174,51 +142,39 @@ npm run tauri:dev
 
 ## 繁體中文
 
-TOEFL Answer Collection 是以本機為優先、使用 Windows/Tauri 的 TOEFL 答案記錄與英文盲打工具，搭配應用程式外的學習資料使用。[公開原始碼](https://github.com/HanamiGekka/TOEFL-Answer-Collection)與 [Windows v1.0.1 正式版](https://github.com/HanamiGekka/TOEFL-Answer-Collection/releases/tag/v1.0.1)現已提供。
+TOEFL Answer Collection 是**以本機為優先的 Windows 答案記錄與英文盲打工具**，用來記錄 TOEFL 練習答案、計時與複習。學習資料在應用程式外自行參閱；**程式不包含官方題目、音訊或標準答案**。
 
+### 快速開始
 
-在 Windows 10/11 x64 上一般使用時，執行目前使用者模式的 NSIS 安裝程式，再從開始功能表啟動 TOEFL Answer Collection。使用者不需安裝 Node.js、npm、Rust、Cargo、Git、Visual Studio Build Tools 或 Python。Windows 執行時需要 Microsoft Edge WebView2；支援的 Windows 通常已具備，缺少時安裝程式可能協助安裝。未簽署的安裝程式可能觸發 SmartScreen 警告。
+1. 從 [Release 下載 v1.0.1 Windows 安裝程式](https://github.com/HanamiGekka/TOEFL-Answer-Collection/releases/tag/v1.0.1)，以目前的 Windows 帳戶安裝，再從開始功能表啟動。
+2. 在練習頁輸入**練習名稱**，選擇 Reading／Listening／Writing，再開始練習。接著逐題或批次建題，不必指定教材資料夾。
+3. 英文盲打可直接在同頁的盲打練習區開始，並可暫停或結束；草稿與匯出檔儲存在本機。
+4. 在 Record Manager 檢視已儲存記錄，在設定的**資料資料夾**中查看或選擇儲存位置。
+
+**執行需求：**Windows 10/11 x64 與 Microsoft Edge **WebView2**；未安裝 WebView2 時，安裝程式可能協助導入。安裝程式**未簽署**，可能出現 SmartScreen 警告。執行正式應用程式不需要 Node.js、Rust 等開發工具。[上方展示圖](#english)來自獨立測試環境，只含合成文字。
 
 ### 目前功能
 
-- 新 Session 使用動態 schema v6。在 Reading、Listening、Writing 中，可逐題建立單選、多選、短文字與長文字 Item，支援自訂標籤、選項標籤和選用時限。
-- 批次建題支援 1–100 題。內建批次為 Reading 填空 ×10、Academic Reading 單選 ×5、Academic Lecture 單選 ×4、Writing Build a Sentence ×10。每個 Section 可儲存、重新載入、更新、刪除和重複套用含多個 block 的範本。範本儲存在目前資料資料夾的本機設定中。
-- Session 支援導覽、暫停、計時、狀態標記、重新開啟 Section、Summary、復原未完成 Session，以及多種格式的本機匯出。
-- 獨立 Typing 模式支援英文盲打、草稿、統計和匯出。本機 Record Manager 管理記錄與 Trash。
-- 正式 v1.0.0 的動態 v6 記錄仍可讀取；不再支援 v6 之前的記錄，舊 Speaking 執行程式碼已移除。快捷鍵設定顯示易讀名稱，記錄卡片的技術資訊可按需展開。
-- 應用程式不讀取或儲存真實題目、音訊或標準答案；沒有網路功能或遙測。
-- 介面支援英文、簡體中文、日文與繁體中文；首次使用預設英文，已儲存的語言選擇會保留。
-
-### 本機開發
-
-Node 使用 [`app/.nvmrc`](app/.nvmrc) 中的 24.18.0；`package.json` 接受同一 24 系列的相容版本。Rust 由 `app/src-tauri/rust-toolchain.toml` 固定為 1.96.1。安裝 Tauri 所需的 Windows 元件後，在 `app/` 使用鎖定檔：
-
-```powershell
-npm ci
-npm run audit:privacy
-npm run audit:i18n
-npm run audit:public-release
-npm run typecheck
-npm run lint
-npm run test
-npm run build
-npm run e2e
-npm run tauri:dev
-```
-
-在 `app/src-tauri/` 執行 `cargo fmt --check`、`cargo check --locked`、`cargo test --locked` 和 `cargo audit`。在 Windows 上，`npm run tauri:build` 會產生目前使用者模式的 NSIS 安裝程式；正式版尚未簽署。執行結構見[架構](docs/product/ARCHITECTURE.md)。僅在維護相依套件時使用 `npm install` 更新 `package.json` / `package-lock.json`，再以 `npm ci` 複驗。公開儲存庫設有 Ubuntu 前端及 Windows native／封裝 CI。
+- Reading、Listening、Writing 以**動態 schema v6** 記錄答案，可建立單選、多選、短文字、長文字題目，設定自訂標籤與選用時限。
+- 支援 **1–100 題**批次建立、內建批次與各部分含多個區塊的可重用範本；範本儲存在目前資料資料夾的本機設定中。
+- 支援計時、暫停與繼續、狀態標記、題目導覽、重新開啟部分、結果摘要、復原未完成工作階段與多格式匯出。
+- 獨立英文盲打提供草稿、統計與匯出；Record Manager 與垃圾桶管理本機記錄。
+- 介面支援英文、簡體中文、日文與繁體中文。首次預設英文，後續保留已儲存的語言選擇。
+- 正式 **v1.0.0 動態 v6 記錄仍可讀取**；不支援 v6 之前的記錄，目前程式不提供 Speaking。
 
 ### 資料安全
 
-安裝應用程式後，輸入練習名稱、選擇 Reading／Listening／Writing，再按「開始練習」即可，無需準備外部檔案或教材資料夾。應用程式不需要知道另行使用的學習資料存放位置。
+**資料資料夾**預設位於目前帳戶的應用程式資料目錄。記錄、Recovery、SQLite、日誌與匯出儲存在這裡，應用程式設定另存於帳戶的設定目錄。**變更資料資料夾不會自動移轉舊記錄**；需要查看舊記錄時，請重新選擇原資料夾。
 
-資料資料夾預設位於目前使用者的應用程式資料目錄。設定中可選擇其他資料夾或開啟目前的資料夾。記錄、Recovery、SQLite、日誌與匯出儲存在資料資料夾下；設定儲存在使用者的應用程式設定目錄。更換資料資料夾不會自動移轉舊記錄；如需檢視，請在設定中選擇原資料夾。正式記錄請透過應用程式內的 Record Manager 刪除。詳見[工程規則](AGENTS.md)與[隱私及安全](docs/product/PRIVACY_AND_SAFETY.md)。
+應用程式沒有網路功能或遙測。正式記錄透過 Record Manager 刪除，分享匯出檔前請檢查內容。公開原始碼不含個人答案、真實練習記錄、Recovery、資料庫、本機設定、外部教材或私有開發歷史。詳見[隱私及安全](docs/product/PRIVACY_AND_SAFETY.md)。
 
-公開原始碼不包含真實資料、使用者記錄、Recovery、SQLite、本機設定、匯出和私人開發歷史。
+### 本機開發
+
+從原始碼建置使用 **Node.js 24.18.0**（接受相容的 24.x）與 **Rust 1.96.1**，並需準備 Windows Tauri 元件。[開發與建置指南](docs/development/BUILD.md)集中說明安裝、稽核、測試與封裝指令；執行結構見[架構](docs/product/ARCHITECTURE.md)。儲存庫 CI 檢查 Ubuntu 前端與 Windows 原生／封裝行為。
 
 ### 授權與獨立性
 
-本專案原創原始碼及文件採用 [MIT 授權](LICENSE)；第三方相依套件保留各自的授權。本專案是獨立的學習工具，與 ETS 無關，也未獲其認可。儲存庫不散布官方 TOEFL 題目、音訊或答案；真實學習資料保留在儲存庫外。
+專案原創原始碼及文件採用 [MIT 授權](LICENSE)，相依套件保留各自條款。本專案是獨立學習工具，**與 ETS 無關，也未獲其認可**；不散布官方 TOEFL 題目、音訊或答案。
 
 ### 文件
 

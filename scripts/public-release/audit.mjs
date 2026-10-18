@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, rmdirSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +14,9 @@ const reviewedIcons = new Map([
   ['app/src-tauri/icons/128x128@2x.png', 256],
   ['app/src-tauri/icons/icon.png', 512],
   ['app/src-tauri/icons/icon.ico', 256],
+]);
+const reviewedPresentation = new Map([
+  ['docs/images/home-and-typing-v1.0.1.jpg', '93909becab7af20c83fda2d8568cb12de27789a2b030c40f0fee37c0b7f62cf9'],
 ]);
 const allowedExtensions = new Set(['.cjs', '.css', '.csv', '.html', '.json', '.jsonl', '.md', '.mjs', '.rs', '.toml', '.ts', '.tsx', '.txt', '.yml']);
 const forbiddenDirectories = new Set(['.git', 'Demand', 'Code prompt', 'data', 'records', 'typing_records', 'trash', 'exports', 'logs', 'backups', 'temp', 'local_assets', 'release-artifacts', 'Recovery', 'Organized_TOEFL_Resources', 'private_data', 'real_data']);
@@ -103,6 +107,11 @@ function auditCandidate(root) {
       verifyReviewedIcon(path, buffer);
       continue;
     }
+    if (reviewedPresentation.has(path)) {
+      assert(buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff && buffer.at(-2) === 0xff && buffer.at(-1) === 0xd9, `Invalid presentation JPEG: ${path}`);
+      assert(createHash('sha256').update(buffer).digest('hex') === reviewedPresentation.get(path), `Presentation bytes changed: ${path}`);
+      continue; // Individually reviewed synthetic UI capture; no general binary exemption.
+    }
     assert(!buffer.includes(0), `Unexpected binary content: ${path}`);
     const content = buffer.toString('utf8');
     assert(!content.includes('\uFFFD'), `Invalid UTF-8 in public file: ${path}`);
@@ -112,6 +121,7 @@ function auditCandidate(root) {
     if (path.endsWith('.md')) verifyMarkdownLinks(root, path, content);
   }
   for (const path of reviewedIcons.keys()) assert(files.includes(path), `Missing reviewed icon: ${path}`);
+  for (const path of reviewedPresentation.keys()) assert(files.includes(path), `Missing reviewed presentation: ${path}`);
   for (const needed of ['LICENSE', 'README.md', 'docs/development/CHANGELOG.md', 'docs/development/ROADMAP.md']) {
     assert(files.includes(needed), `Missing public file: ${needed}`);
   }

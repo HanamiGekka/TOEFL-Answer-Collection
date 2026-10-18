@@ -44,7 +44,10 @@
     "docs/product/EXPORT_FORMAT.md",
     "docs/product/PRIVACY_AND_SAFETY.md",
     "docs/product/SHORTCUTS.md",
-    "docs/product/UI_THEME.md"
+    "docs/product/UI_THEME.md",
+    "docs/development/BUILD.md",
+    "docs/product/SCREENSHOTS.md",
+    "docs/images/home-and-typing-v1.0.1.jpg"
   ],
   "directories": [
     "app/src/",
