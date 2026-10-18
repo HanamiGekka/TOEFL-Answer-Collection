@@ -30,7 +30,7 @@ npm run tauri:dev
 
 The independent Documentation checks workflow runs without installing application dependencies. It validates the public-safe snapshot independently of the full CI dependency/build checks. The full CI security gates remain enabled.
 
-The existing privacy and public-release audits check the reviewed public surface, local Markdown links, four README language anchors and release facts. The synthetic screenshot is individually allowlisted and pinned by SHA-256; this does not allow arbitrary binary files.
+The existing privacy and public-release audits check the reviewed public surface, local Markdown links, four standalone READMEs, historical language-anchor bridges and release facts. The synthetic screenshot is individually allowlisted and pinned by SHA-256; this does not allow arbitrary binary files.
 
 The 2026-10-18 maintenance lockfile uses development-only `source-map-js` **1.2.2**, within PostCSS's existing `^1.2.1` range, for [GHSA-68fv-2mgg-jv7q](https://github.com/advisories/GHSA-68fv-2mgg-jv7q). This changes no direct dependency, application source, Session schema, version or frozen v1.0.1 installer. Current source checks do not establish the security status of an older binary.
 

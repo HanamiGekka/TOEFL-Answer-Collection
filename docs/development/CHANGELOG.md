@@ -1,5 +1,9 @@
 # Changelog
 
+## Targeted documentation refinement — 2026-10-18
+
+- Open each language in a standalone README with the same accepted English-UI screenshot, localized caption and direct navigation. Historical language URLs remain usable through short bridge sections in the English README.
+
 ## Documentation maintenance — 2026-10-18
 
 - Clarify the four-language Windows/practice/typing quick start and link the separate development guide.

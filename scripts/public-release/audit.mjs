@@ -125,7 +125,6 @@ function auditCandidate(root) {
   for (const needed of ['LICENSE', 'README.md', 'docs/development/CHANGELOG.md', 'docs/development/ROADMAP.md']) {
     assert(files.includes(needed), `Missing public file: ${needed}`);
   }
-  assert(!files.some((path) => /^README\.(?:zh-CN|ja|zh-TW)\.md$/u.test(path)), 'Obsolete localized README copied');
   const license = readFileSync(join(root, 'LICENSE'), 'utf8').replaceAll('\r\n', '\n');
   assert(license.startsWith('MIT License\n') && license.includes('Permission is hereby granted'), 'MIT license is missing or invalid');
   const version = readFileSync(join(root, 'VERSION'), 'utf8').trim();
@@ -141,32 +140,42 @@ function auditCandidate(root) {
   assert(cargoToml.split('[lib]')[0].includes(`version = "${version}"`), 'Public Cargo package version mismatch');
   assert(cargoLock.includes(`name = "toefl-answer-collection"\nversion = "${version}"`), 'Public Cargo lock version mismatch');
   assert(appConstants.includes(`APP_VERSION = '${version}'`), 'Public application display version mismatch');
-  const readme = readFileSync(join(root, 'README.md'), 'utf8').replaceAll('\r\n', '\n');
-  const sections = [
-    ['english', 'English'],
-    ['simplified-chinese', '简体中文'],
-    ['japanese', '日本語'],
-    ['traditional-chinese', '繁體中文'],
+  const navigation = '[English](README.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md) | [繁體中文](README.zh-TW.md)';
+  const readmes = [
+    ['README.md', ['Training name', 'Data folder', 'local-first', 'official TOEFL questions']],
+    ['README.zh-CN.md', ['训练名称', '数据文件夹', '本地优先', '不分发官方 TOEFL']],
+    ['README.ja.md', ['練習名', 'データフォルダー', 'ローカル優先', '公式 TOEFL']],
+    ['README.zh-TW.md', ['練習名稱', '資料資料夾', '本機優先', '不散布官方 TOEFL']],
   ];
-  const positions = sections.map(([anchor, label]) => {
-    assert(readme.includes(`](#${anchor})`), `Missing README navigation: ${anchor}`);
-    const position = readme.indexOf(`<a id="${anchor}"></a>\n\n## ${label}`);
-    assert(position >= 0, `Missing README language: ${label}`);
-    return position;
-  });
-  assert(positions.every((position, index) => index === 0 || position > positions[index - 1]), 'Wrong README language order');
-  for (let index = 0; index < positions.length; index += 1) {
-    const content = readme.slice(positions[index], positions[index + 1]);
-    for (const fact of ['v1.0.1', '/releases/tag/v1.0.1', 'ETS', '(LICENSE)', 'WebView2', 'Node.js', 'Rust']) {
-      assert(content.includes(fact), `Missing README fact in ${sections[index][1]}: ${fact}`);
+  for (const [path, currentFacts] of readmes) {
+    assert(files.includes(path), `Missing README language file: ${path}`);
+    const content = readFileSync(join(root, path), 'utf8').replaceAll('\r\n', '\n');
+    assert(content.startsWith(`# TOEFL Answer Collection\n\n${navigation}\n`), `Missing README navigation: ${path}`);
+    const ids = [...content.matchAll(/<a id="([^"]+)"><\/a>/gu)].map((match) => match[1]);
+    assert(new Set(ids).size === ids.length, `Duplicate README anchor: ${path}`);
+    const screenshot = /!\[[^\]]+\]\(docs\/images\/home-and-typing-v1\.0\.1\.jpg\)/u;
+    assert(screenshot.test(content.split('\n').slice(0, 20).join('\n')), `Missing top README screenshot: ${path}`);
+    assert(content.includes('(docs/product/SCREENSHOTS.md)'), `Missing screenshot provenance: ${path}`);
+    for (const fact of ['v1.0.1', '/releases/tag/v1.0.1', 'ETS', '(LICENSE)', 'WebView2', 'Node.js', 'Rust', 'Tauri', 'TypeScript', 'v1.0.0', 'v6', 'Speaking', 'Reading', 'Listening', 'Writing', ...currentFacts]) {
+      assert(content.includes(fact), `Missing README fact in ${path}: ${fact}`);
     }
-    const currentFacts = [
-      ['Training name', 'Data folder', 'local-first', 'official TOEFL questions'],
-      ['训练名称', '数据文件夹', '以本地为主', '不分发官方 TOEFL'],
-      ['練習名', 'データフォルダー', 'ローカル優先', '公式 TOEFL'],
-      ['練習名稱', '資料資料夾', '以本機為優先', '不散布官方 TOEFL'],
-    ][index];
-    for (const fact of currentFacts) assert(content.includes(fact), `Missing current README fact in ${sections[index][1]}: ${fact}`);
+  }
+  const english = readFileSync(join(root, 'README.md'), 'utf8').replaceAll('\r\n', '\n');
+  for (const [anchor, target] of [
+    ['english', null],
+    ['simplified-chinese', 'README.zh-CN.md'],
+    ['japanese', 'README.ja.md'],
+    ['traditional-chinese', 'README.zh-TW.md'],
+  ]) {
+    const marker = `<a id="${anchor}"></a>`;
+    assert(english.split(marker).length === 2, `Missing legacy README anchor: ${anchor}`);
+    if (target) {
+      // Read only the current bridge, ending at the next explicit legacy anchor.
+      const start = english.indexOf(marker) + marker.length;
+      const end = english.indexOf('<a id=', start);
+      const content = english.slice(start, end === -1 ? undefined : end);
+      assert(content.includes(`](${target})`) && content.length < 300, `Invalid legacy README bridge: ${anchor}`);
+    }
   }
   assert(!existsSync(join(root, 'Demand')) && !existsSync(join(root, 'temp')) && !existsSync(join(root, 'records')), 'Private directory copied');
   return files.length;
@@ -203,13 +212,30 @@ function selfCheck(root) {
   } finally {
     writeFileSync(readme, original);
   }
-  writeFileSync(readme, original.toString('utf8').replace('## 日本語', '## Missing'));
-  try {
-    let rejected = false;
-    try { auditCandidate(root); } catch (error) { rejected = String(error).includes('Missing README language'); }
-    assert(rejected, 'Public audit did not reject a missing README language');
-  } finally {
-    writeFileSync(readme, original);
+  const japanese = join(root, 'README.ja.md');
+  const originalJapanese = readFileSync(japanese);
+  for (const [candidate, expected] of [
+    [originalJapanese.toString('utf8').replaceAll('WebView2', 'MissingComponent'), 'Missing README fact'],
+    [originalJapanese.toString('utf8').replace('(README.zh-TW.md)', '(README.missing.md)'), 'Broken public Markdown link'],
+    [originalJapanese.toString('utf8') + 'C:' + '\\Users\\' + 'synthetic' + '\\private\n', 'Local machine path'],
+  ]) {
+    writeFileSync(japanese, candidate);
+    try {
+      let rejected = false;
+      try { auditCandidate(root); } catch (error) { rejected = String(error).includes(expected); }
+      assert(rejected, `Public audit did not reject localized README probe: ${expected}`);
+    } finally { writeFileSync(japanese, originalJapanese); }
+  }
+  for (const [candidate, expected] of [
+    [original.toString('utf8').replace('<a id="japanese"></a>', '<a id="missing"></a>'), 'Missing legacy README anchor'],
+    [original.toString('utf8') + '\n<a id="english"></a>\n', 'Duplicate README anchor'],
+  ]) {
+    writeFileSync(readme, candidate);
+    try {
+      let rejected = false;
+      try { auditCandidate(root); } catch (error) { rejected = String(error).includes(expected); }
+      assert(rejected, `Public audit did not reject legacy README probe: ${expected}`);
+    } finally { writeFileSync(readme, original); }
   }
   const versionPath = join(root, 'VERSION');
   const originalVersion = readFileSync(versionPath);
