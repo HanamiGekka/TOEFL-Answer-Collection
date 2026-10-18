@@ -14,7 +14,7 @@ TOEFL Answer Collection 是**本機優先的 Windows 答案記錄與英文盲打
 1. 從 [Release 下載 v1.0.1 Windows 安裝程式](https://github.com/HanamiGekka/TOEFL-Answer-Collection/releases/tag/v1.0.1)，以目前的 Windows 帳戶安裝，再從開始功能表啟動。
 2. 在練習頁輸入**練習名稱**，選擇 Reading／Listening／Writing，再開始練習。接著逐題或批次建題，不必指定教材資料夾。
 3. 英文盲打可直接在同頁的盲打練習區開始，並可暫停或結束；草稿與匯出檔儲存在本機。
-4. 在 Record Manager 檢視已儲存記錄，在設定的 **Data folder（資料資料夾）**中查看或選擇儲存位置。
+4. 在 Record Manager 檢視已儲存記錄，在設定的 **Data folder（資料資料夾）** 中查看或選擇儲存位置。
 
 **執行需求：**Windows 10/11 x64 與 Microsoft Edge **WebView2**；未安裝 WebView2 時，安裝程式可能協助導入。安裝程式**未簽署**，可能出現 SmartScreen 警告。執行正式應用程式不需要 Node.js、Rust 等開發工具。
 
