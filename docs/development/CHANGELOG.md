@@ -1,5 +1,10 @@
 # Changelog
 
+## Documentation maintenance — 2026-10-18
+
+- Clarify the four-language Windows/practice/typing quick start and link the separate development guide.
+- Add an actual installed-app screenshot using isolated synthetic data, with provenance and an image-integrity check.
+
 User-visible changes. R numbers identify development rounds within a release.
 
 ## 1.0.1 — 2026-10-03

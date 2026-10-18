@@ -47,7 +47,8 @@
     "docs/product/UI_THEME.md",
     "docs/development/BUILD.md",
     "docs/product/SCREENSHOTS.md",
-    "docs/images/home-and-typing-v1.0.1.jpg"
+    "docs/images/home-and-typing-v1.0.1.jpg",
+    ".github/workflows/documentation.yml"
   ],
   "directories": [
     "app/src/",
